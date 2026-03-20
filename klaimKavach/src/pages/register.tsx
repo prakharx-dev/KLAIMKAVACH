@@ -1,13 +1,22 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { useRegisterUser } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
-import { Shield, ArrowRight, Loader2, CheckCircle2, Zap, Lock } from "lucide-react";
+import {
+  Shield,
+  ArrowRight,
+  Loader2,
+  CheckCircle2,
+  Zap,
+  Lock,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/hooks/use-auth";
+import { isPlanId, plansById } from "@/lib/plans";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +43,20 @@ export default function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { mutate: register, isPending } = useRegisterUser();
-  const { login } = useAuth();
+  const { login, selectedPlan } = useAuth();
+
+  const selectedPlanId = useMemo(() => {
+    if (typeof window === "undefined") return selectedPlan;
+    const planFromQuery = new URLSearchParams(window.location.search).get(
+      "plan",
+    );
+    if (isPlanId(planFromQuery)) return planFromQuery;
+    return selectedPlan;
+  }, [selectedPlan]);
+
+  const selectedPlanName = selectedPlanId
+    ? plansById[selectedPlanId].name
+    : "your chosen";
 
   const {
     register: formRegister,
@@ -49,10 +71,10 @@ export default function Register() {
       { data },
       {
         onSuccess: () => {
-          login(data.name); // Store login state
+          login(data.name, selectedPlanId ?? undefined);
           toast({
             title: "Welcome to KlaimKavach",
-            description: "Your account has been secured.",
+            description: `Your ${selectedPlanName} plan is now active.`,
           });
           setLocation("/dashboard");
         },
@@ -63,7 +85,7 @@ export default function Register() {
             variant: "destructive",
           });
         },
-      }
+      },
     );
   };
 
@@ -91,8 +113,14 @@ export default function Register() {
 
         {/* Top — Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <img src="/logo.jpg" alt="KlaimKavach" className="w-9 h-9 rounded-lg object-contain" />
-          <span className="text-white font-semibold text-lg tracking-tight">KlaimKavach</span>
+          <img
+            src="/logo.jpg"
+            alt="KlaimKavach"
+            className="w-9 h-9 rounded-lg object-contain"
+          />
+          <span className="text-white font-semibold text-lg tracking-tight">
+            KlaimKavach
+          </span>
         </div>
 
         {/* Middle — Headline + Features */}
@@ -105,7 +133,8 @@ export default function Register() {
               Coverage that works as hard as you do.
             </h2>
             <p className="text-white/40 text-base leading-relaxed max-w-sm">
-              Built for delivery riders, cab drivers, and freelancers. Get instant claims, smart risk scoring, and real protection.
+              Built for delivery riders, cab drivers, and freelancers. Get
+              instant claims, smart risk scoring, and real protection.
             </p>
           </div>
 
@@ -129,7 +158,7 @@ export default function Register() {
 
         {/* Bottom — Social proof */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-white/3 border border-white/6">
             <div className="flex -space-x-2">
               {["A", "R", "M", "K"].map((initial, i) => (
                 <div
@@ -142,7 +171,8 @@ export default function Register() {
             </div>
             <div>
               <p className="text-xs text-white/60">
-                <span className="text-white font-semibold">2,400+</span> workers joined this week
+                <span className="text-white font-semibold">2,400+</span> workers
+                joined this week
               </p>
             </div>
           </div>
@@ -158,7 +188,11 @@ export default function Register() {
       >
         {/* Mobile logo */}
         <div className="flex items-center gap-2 mb-10 lg:hidden">
-          <img src="/logo.jpg" alt="KlaimKavach" className="w-8 h-8 rounded-md object-contain" />
+          <img
+            src="/logo.jpg"
+            alt="KlaimKavach"
+            className="w-8 h-8 rounded-md object-contain"
+          />
           <span className="font-semibold text-foreground">KlaimKavach</span>
         </div>
 
@@ -171,12 +205,20 @@ export default function Register() {
             <p className="text-sm text-muted-foreground">
               Start your free coverage today. No credit card required.
             </p>
+            {selectedPlanId && (
+              <p className="mt-2 text-xs text-emerald-400 font-medium uppercase tracking-widest">
+                Selected plan: {selectedPlanName}
+              </p>
+            )}
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div className="space-y-1.5">
-              <Label htmlFor="name" className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              <Label
+                htmlFor="name"
+                className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+              >
                 Full Name
               </Label>
               <Input
@@ -185,11 +227,18 @@ export default function Register() {
                 className="h-11 bg-[#111] border-[#222] text-foreground placeholder:text-white/20 focus-visible:border-white/40 focus-visible:ring-0 rounded-lg"
                 {...formRegister("name")}
               />
-              {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+              {errors.name && (
+                <p className="text-xs text-destructive">
+                  {errors.name.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              <Label
+                htmlFor="email"
+                className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+              >
                 Email
               </Label>
               <Input
@@ -199,11 +248,18 @@ export default function Register() {
                 className="h-11 bg-[#111] border-[#222] text-foreground placeholder:text-white/20 focus-visible:border-white/40 focus-visible:ring-0 rounded-lg"
                 {...formRegister("email")}
               />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+              {errors.email && (
+                <p className="text-xs text-destructive">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="phone" className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              <Label
+                htmlFor="phone"
+                className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+              >
                 Phone
               </Label>
               <Input
@@ -212,12 +268,19 @@ export default function Register() {
                 className="h-11 bg-[#111] border-[#222] text-foreground placeholder:text-white/20 focus-visible:border-white/40 focus-visible:ring-0 rounded-lg"
                 {...formRegister("phone")}
               />
-              {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
+              {errors.phone && (
+                <p className="text-xs text-destructive">
+                  {errors.phone.message}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="vehicle" className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                <Label
+                  htmlFor="vehicle"
+                  className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+                >
                   Vehicle
                 </Label>
                 <Input
@@ -226,11 +289,18 @@ export default function Register() {
                   className="h-11 bg-[#111] border-[#222] text-foreground placeholder:text-white/20 focus-visible:border-white/40 focus-visible:ring-0 rounded-lg"
                   {...formRegister("vehicle")}
                 />
-                {errors.vehicle && <p className="text-xs text-destructive">{errors.vehicle.message}</p>}
+                {errors.vehicle && (
+                  <p className="text-xs text-destructive">
+                    {errors.vehicle.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="city" className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                <Label
+                  htmlFor="city"
+                  className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+                >
                   City
                 </Label>
                 <Input
@@ -239,7 +309,11 @@ export default function Register() {
                   className="h-11 bg-[#111] border-[#222] text-foreground placeholder:text-white/20 focus-visible:border-white/40 focus-visible:ring-0 rounded-lg"
                   {...formRegister("city")}
                 />
-                {errors.city && <p className="text-xs text-destructive">{errors.city.message}</p>}
+                {errors.city && (
+                  <p className="text-xs text-destructive">
+                    {errors.city.message}
+                  </p>
+                )}
               </div>
             </div>
 

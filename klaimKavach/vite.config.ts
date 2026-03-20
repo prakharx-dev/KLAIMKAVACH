@@ -13,21 +13,131 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const basePath = process.env.BASE_PATH || "/";
+const useMockApi = process.env.MOCK_API === "true";
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function isPrivateIp(ipAddress?: string): boolean {
+  if (!ipAddress) return true;
+  if (ipAddress === "::1") return true;
+
+  if (ipAddress.includes(".")) {
+    const parts = ipAddress.split(".").map((part) => Number(part));
+    if (
+      parts.length !== 4 ||
+      parts.some((part) => Number.isNaN(part) || part < 0 || part > 255)
+    ) {
+      return true;
+    }
+
+    const [a, b] = parts;
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    return false;
+  }
+
+  const lowered = ipAddress.toLowerCase();
+  return lowered.startsWith("fc") || lowered.startsWith("fd");
+}
+
+function simpleHash(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function isLikelyInIndia(latitude: number, longitude: number): boolean {
+  return latitude >= 6 && latitude <= 38 && longitude >= 68 && longitude <= 98;
+}
+
+function calculateMockTrustScore(input: {
+  latitude?: number;
+  longitude?: number;
+  ipAddress?: string;
+}): { trustScore: number; status: string; label: string; details: string } {
+  let score = 50;
+  const hasLocation =
+    typeof input.latitude === "number" &&
+    Number.isFinite(input.latitude) &&
+    input.latitude >= -90 &&
+    input.latitude <= 90 &&
+    typeof input.longitude === "number" &&
+    Number.isFinite(input.longitude) &&
+    input.longitude >= -180 &&
+    input.longitude <= 180;
+  const hasPublicIp = !!input.ipAddress && !isPrivateIp(input.ipAddress);
+
+  if (hasLocation) {
+    const latitude = input.latitude as number;
+    const longitude = input.longitude as number;
+
+    score += isLikelyInIndia(latitude, longitude) ? 18 : -10;
+    const locationFingerprint = `${latitude.toFixed(3)}:${longitude.toFixed(3)}`;
+    score += simpleHash(locationFingerprint) % 12;
+  } else {
+    score -= 12;
+  }
+
+  if (hasPublicIp) {
+    score += 10 + (simpleHash(input.ipAddress as string) % 10);
+  } else {
+    score -= 14;
+  }
+
+  const trustScore = clamp(Math.round(score), 0, 100);
+
+  if (trustScore > 75) {
+    return {
+      trustScore,
+      status: "Excellent",
+      label: "Verified",
+      details:
+        "Location and network signals look trustworthy. Claims are eligible for fast-track verification.",
+    };
+  }
+
+  if (trustScore >= 45) {
+    return {
+      trustScore,
+      status: "Moderate",
+      label: "Needs Review",
+      details:
+        "Some trust signals are weak or incomplete. Additional checks may be required for high-value claims.",
+    };
+  }
+
+  return {
+    trustScore,
+    status: "High Risk",
+    label: "Suspicious",
+    details:
+      "Trust signals are low due to inconsistent location or IP data. Manual fraud screening is recommended.",
+  };
+}
 
 const mockApiPlugin = (): Plugin => {
   let activeUserName = "Gig Worker"; // In-memory state
 
   return {
-    name: 'mock-api',
+    name: "mock-api",
     configureServer(server) {
       server.middlewares.use((req: any, res: any, next: any) => {
-        if (req.url?.startsWith('/api/')) {
-          res.setHeader('Content-Type', 'application/json');
+        if (req.url?.startsWith("/api/")) {
+          res.setHeader("Content-Type", "application/json");
 
-          if (req.url.includes('/register') && req.method === 'POST') {
-            let body = '';
-            req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
-            req.on('end', () => {
+          if (req.url.includes("/register") && req.method === "POST") {
+            let body = "";
+            req.on("data", (chunk: Buffer) => {
+              body += chunk.toString();
+            });
+            req.on("end", () => {
               try {
                 const data = JSON.parse(body);
                 if (data.name) {
@@ -36,54 +146,82 @@ const mockApiPlugin = (): Plugin => {
               } catch (e) {
                 // Ignore parse errors
               }
-              res.end(JSON.stringify({ success: true, userId: "u_123", message: "Registered successfully" }));
+              res.end(
+                JSON.stringify({
+                  success: true,
+                  userId: "u_123",
+                  message: "Registered successfully",
+                }),
+              );
             });
             return;
           }
 
-          if (req.url.includes('/dashboard')) {
-            res.end(JSON.stringify({
-              userName: activeUserName,
-              riskScore: 24,
-              riskLevel: "Low Risk",
-              weeklyPremium: 49,
-              coverageAmount: 25000,
-              activePolicies: 1,
-              totalClaims: 0,
-              lastUpdated: new Date().toISOString()
-            }));
+          if (req.url.includes("/dashboard")) {
+            res.end(
+              JSON.stringify({
+                userName: activeUserName,
+                riskScore: 24,
+                riskLevel: "Low Risk",
+                weeklyPremium: 49,
+                coverageAmount: 25000,
+                activePolicies: 1,
+                totalClaims: 0,
+                lastUpdated: new Date().toISOString(),
+              }),
+            );
             return;
           }
 
-          if (req.url.includes('/disruption')) {
-            res.end(JSON.stringify({
-              hasDisruption: false,
-              type: "None",
-              severity: "None",
-              message: "Clear skies and normal traffic in your zone.",
-              eligibleForClaim: false
-            }));
+          if (req.url.includes("/disruption")) {
+            res.end(
+              JSON.stringify({
+                hasDisruption: false,
+                type: "None",
+                severity: "None",
+                message: "Clear skies and normal traffic in your zone.",
+                eligibleForClaim: false,
+              }),
+            );
             return;
           }
 
-          if (req.url.includes('/claim')) {
-            res.end(JSON.stringify({
-              success: true,
-              claimId: "cl_789",
-              payoutAmount: 500,
-              status: "Approved",
-              message: "Claim approved instantly by AI."
-            }));
+          if (req.url.includes("/claim")) {
+            res.end(
+              JSON.stringify({
+                success: true,
+                claimId: "cl_789",
+                payoutAmount: 500,
+                status: "Approved",
+                message: "Claim approved instantly by AI.",
+              }),
+            );
             return;
           }
 
-          if (req.url.includes('/fraud')) {
-            res.end(JSON.stringify({
-              trustScore: 98,
-              status: "Excellent",
-              label: "Verified",
-              details: "No anomalous patterns detected in recent activity."
-            }));
+          if (req.url.includes("/fraud")) {
+            if (req.method === "POST") {
+              let body = "";
+              req.on("data", (chunk: Buffer) => {
+                body += chunk.toString();
+              });
+              req.on("end", () => {
+                let parsed: {
+                  latitude?: number;
+                  longitude?: number;
+                  ipAddress?: string;
+                } = {};
+                try {
+                  parsed = JSON.parse(body);
+                } catch {
+                  parsed = {};
+                }
+                res.end(JSON.stringify(calculateMockTrustScore(parsed)));
+              });
+              return;
+            }
+
+            res.end(JSON.stringify(calculateMockTrustScore({})));
             return;
           }
 
@@ -93,7 +231,7 @@ const mockApiPlugin = (): Plugin => {
         }
         next();
       });
-    }
+    },
   };
 };
 
@@ -103,7 +241,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
-    mockApiPlugin(),
+    ...(useMockApi ? [mockApiPlugin()] : []),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -121,7 +259,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
-      "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
+      "@assets": path.resolve(
+        import.meta.dirname,
+        "..",
+        "..",
+        "attached_assets",
+      ),
     },
     dedupe: ["react", "react-dom"],
   },

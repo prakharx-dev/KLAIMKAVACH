@@ -1,45 +1,73 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { plansById } from "@/lib/plans";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSubmitClaim } from "@workspace/api-client-react";
-import { Clock, IndianRupee, FileText, CheckCircle, ArrowRight, Loader2 } from "lucide-react";
+import {
+  Clock,
+  IndianRupee,
+  FileText,
+  CheckCircle,
+  ArrowRight,
+  Loader2,
+} from "lucide-react";
 
 import { Card } from "@/components/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function Claim() {
-  const [hours, setHours] = useState<number>(4);
+  const [hours, setHours] = useState<number>(1);
   const [reason, setReason] = useState("");
   const [, setLocation] = useLocation();
-  const { isAuthenticated } = useAuth();
-  
+  const { isAuthenticated, selectedPlan } = useAuth();
+
+  const activePlan = selectedPlan ? plansById[selectedPlan] : null;
+  const payoutPerHour = activePlan?.claimPayoutPerHour ?? 120;
+  const maxHours = activePlan?.claimHoursCap ?? 8;
+
+  useEffect(() => {
+    setHours((prev) => Math.min(Math.max(prev, 1), maxHours));
+  }, [maxHours]);
+
   useEffect(() => {
     if (!isAuthenticated) {
       setLocation("/register");
+      return;
     }
-  }, [isAuthenticated, setLocation]);
 
-  const [step, setStep] = useState<"select" | "details" | "submitting" | "success">("select");
-  const { mutate: submitClaim, isPending, data: successData } = useSubmitClaim();
-  
-  const PAYOUT_PER_HOUR = 150;
-  const totalPayout = hours * PAYOUT_PER_HOUR;
+    if (!selectedPlan) {
+      setLocation("/pricing");
+    }
+  }, [isAuthenticated, selectedPlan, setLocation]);
+
+  if (!isAuthenticated || !selectedPlan || !activePlan) return null;
+
+  const [step, setStep] = useState<
+    "select" | "details" | "submitting" | "success"
+  >("select");
+  const {
+    mutate: submitClaim,
+    isPending,
+    data: successData,
+  } = useSubmitClaim();
+
+  const totalPayout = hours * payoutPerHour;
 
   const handleSubmit = () => {
     submitClaim({
       data: {
         hoursLost: hours,
-        reason: reason || "Heavy Rain / Disruption"
-      }
+        reason: reason || "Heavy Rain / Disruption",
+      },
     });
   };
 
   if (successData?.success) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <motion.div 
+        <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.2 }}
@@ -49,29 +77,45 @@ export default function Claim() {
             <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mb-6">
               <CheckCircle className="w-8 h-8 text-emerald-500" />
             </div>
-            
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-2">Claim Approved</h2>
-            <p className="text-muted-foreground text-sm mb-6">{successData.message}</p>
-            
+
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-2">
+              Claim Approved
+            </h2>
+            <p className="text-muted-foreground text-sm mb-6">
+              {successData.message}
+            </p>
+
             <div className="w-full bg-secondary rounded-xl p-5 mb-8 text-left">
               <div className="flex justify-between text-sm mb-3">
-                <span className="text-muted-foreground font-semibold uppercase tracking-widest text-xs">Claim ID</span>
-                <span className="text-foreground font-mono">{successData.claimId}</span>
+                <span className="text-muted-foreground font-semibold uppercase tracking-widest text-xs">
+                  Claim ID
+                </span>
+                <span className="text-foreground font-mono">
+                  {successData.claimId}
+                </span>
               </div>
               <div className="flex justify-between text-sm mb-5 pb-5 border-b border-border">
-                <span className="text-muted-foreground font-semibold uppercase tracking-widest text-xs">Status</span>
-                <span className="text-emerald-500 font-medium">Processing Payment</span>
+                <span className="text-muted-foreground font-semibold uppercase tracking-widest text-xs">
+                  Status
+                </span>
+                <span className="text-emerald-500 font-medium">
+                  Processing Payment
+                </span>
               </div>
               <div className="flex justify-between items-end">
-                <span className="text-muted-foreground font-semibold uppercase tracking-widest text-xs">Approved Payout</span>
-                <span className="text-3xl font-bold text-foreground tabular-nums leading-none">₹{successData.payoutAmount}</span>
+                <span className="text-muted-foreground font-semibold uppercase tracking-widest text-xs">
+                  Approved Payout
+                </span>
+                <span className="text-3xl font-bold text-foreground tabular-nums leading-none">
+                  ₹{totalPayout}
+                </span>
               </div>
             </div>
-            
-            <Button 
+
+            <Button
               variant="outline"
               className="w-full h-10"
-              onClick={() => window.location.href = '/dashboard'}
+              onClick={() => (window.location.href = "/dashboard")}
             >
               Back to Dashboard
             </Button>
@@ -84,8 +128,15 @@ export default function Claim() {
   return (
     <div className="max-w-xl w-full space-y-8 mx-auto">
       <div className="border-b border-border pb-6">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">File a Claim</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Calculate and submit your lost hours instantly.</p>
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
+          File a Claim
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Calculate and submit your lost hours instantly.
+        </p>
+        <p className="text-xs text-emerald-400 mt-2 uppercase tracking-widest font-medium">
+          Active plan: {activePlan.name} ({activePlan.coverage})
+        </p>
       </div>
 
       <Card className="p-8">
@@ -100,16 +151,19 @@ export default function Claim() {
                 </h3>
               </div>
               <div className="text-3xl font-bold text-foreground tabular-nums">
-                {hours} <span className="text-base font-normal text-muted-foreground">hrs</span>
+                {hours}{" "}
+                <span className="text-base font-normal text-muted-foreground">
+                  hrs
+                </span>
               </div>
             </div>
 
             {/* Custom Slider */}
             <div className="relative pt-2 pb-2">
-              <input 
-                type="range" 
-                min="1" 
-                max="12" 
+              <input
+                type="range"
+                min="1"
+                max={maxHours}
                 value={hours}
                 onChange={(e) => setHours(parseInt(e.target.value))}
                 className="w-full h-1 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
@@ -128,8 +182,8 @@ export default function Claim() {
               `}</style>
               <div className="flex justify-between text-xs text-muted-foreground mt-4 font-medium">
                 <span>1h</span>
-                <span>6h</span>
-                <span>12h</span>
+                <span>{Math.ceil(maxHours / 2)}h</span>
+                <span>{maxHours}h</span>
               </div>
             </div>
           </div>
@@ -142,7 +196,7 @@ export default function Claim() {
               <FileText className="w-4 h-4" />
               Additional Details
             </h3>
-            <Textarea 
+            <Textarea
               placeholder="Brief description of the disruption..."
               className="bg-background border-border focus:border-primary text-foreground min-h-[100px] resize-none"
               value={reason}
@@ -153,11 +207,16 @@ export default function Claim() {
           {/* Payout Calculation */}
           <div className="bg-secondary rounded-xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Estimated Payout</p>
-              <p className="text-sm text-muted-foreground">{hours} hrs × ₹{PAYOUT_PER_HOUR}/hr</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                Estimated Payout
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {hours} hrs × ₹{payoutPerHour}/hr
+              </p>
             </div>
             <div className="text-4xl font-bold text-foreground tabular-nums flex items-center gap-1">
-              ₹<AnimatePresence mode="popLayout">
+              ₹
+              <AnimatePresence mode="popLayout">
                 <motion.span
                   key={totalPayout}
                   initial={{ y: -10, opacity: 0 }}
@@ -171,15 +230,19 @@ export default function Claim() {
             </div>
           </div>
 
-          <Button 
+          <Button
             className="w-full h-12 text-base font-medium"
             onClick={handleSubmit}
             disabled={isPending}
           >
             {isPending ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...
+              </>
             ) : (
-              <>Submit Claim <ArrowRight className="w-4 h-4 ml-2" /></>
+              <>
+                Submit Claim <ArrowRight className="w-4 h-4 ml-2" />
+              </>
             )}
           </Button>
         </div>

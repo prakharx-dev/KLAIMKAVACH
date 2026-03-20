@@ -88,10 +88,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/ClaimResponse"
   /fraud:
-    get:
+    post:
       operationId: getFraudStatus
       tags: [insurance]
-      summary: Get fraud detection status
+      summary: Calculate fraud trust score from telemetry signals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FraudInput"
       responses:
         "200":
           description: Fraud detection result
@@ -225,3 +231,12 @@ components:
         - trustScore
         - status
         - label
+    FraudInput:
+      type: object
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+        ipAddress:
+          type: string

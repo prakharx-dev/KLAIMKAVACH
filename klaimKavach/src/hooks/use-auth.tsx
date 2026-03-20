@@ -1,9 +1,18 @@
-import { useState, createContext, useContext, useEffect, ReactNode } from "react";
+import {
+  useState,
+  createContext,
+  useContext,
+  useEffect,
+  ReactNode,
+} from "react";
+import { PlanId, isPlanId } from "@/lib/plans";
 
 interface AuthContextType {
   user: string | null;
+  selectedPlan: PlanId | null;
   isAuthenticated: boolean;
-  login: (name: string) => void;
+  login: (name: string, planId?: PlanId) => void;
+  selectPlan: (planId: PlanId) => void;
   logout: () => void;
 }
 
@@ -22,21 +31,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     return false;
   });
+  const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(() => {
+    if (typeof window !== "undefined") {
+      const savedPlan = localStorage.getItem("klaimkavach_plan");
+      return isPlanId(savedPlan) ? savedPlan : null;
+    }
+    return null;
+  });
 
-  const login = (name: string) => {
+  const login = (name: string, planId?: PlanId) => {
     localStorage.setItem("klaimkavach_user", name);
+    if (planId) {
+      localStorage.setItem("klaimkavach_plan", planId);
+      setSelectedPlan(planId);
+    }
     setUser(name);
     setIsAuthenticated(true);
   };
 
+  const selectPlan = (planId: PlanId) => {
+    localStorage.setItem("klaimkavach_plan", planId);
+    setSelectedPlan(planId);
+  };
+
   const logout = () => {
     localStorage.removeItem("klaimkavach_user");
+    localStorage.removeItem("klaimkavach_plan");
     setUser(null);
+    setSelectedPlan(null);
     setIsAuthenticated(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, selectedPlan, isAuthenticated, login, selectPlan, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );
