@@ -7,7 +7,6 @@ import { useSubmitClaim } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Clock,
-  IndianRupee,
   FileText,
   CheckCircle,
   ArrowRight,
@@ -216,7 +215,7 @@ export default function Claim() {
             </h3>
             <Textarea
               placeholder="Brief description of the disruption..."
-              className="bg-background border-border focus:border-primary text-foreground min-h-[100px] resize-none"
+              className="bg-background border-border focus:border-primary text-foreground min-h-25 resize-none"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />

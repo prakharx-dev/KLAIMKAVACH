@@ -23,7 +23,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <Navbar />
 
       {/* ── Main content ── */}
-      <main className={`flex-1 flex flex-col ${isAppPage ? "container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl py-10" : ""} ${isPublicPage && !isHomePage ? "pt-14" : ""}`}>
+      <main
+        className={`flex-1 flex flex-col ${isAppPage ? "container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl py-10" : ""} ${isPublicPage && !isHomePage ? "pt-14" : ""}`}
+      >
         <motion.div
           key={location}
           initial={{ opacity: 0, y: 10 }}
@@ -44,8 +46,10 @@ export function Layout({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-1 p-2 min-w-[64px] transition-colors ${
-                  location === item.href ? "text-foreground" : "text-muted-foreground"
+                className={`flex flex-col items-center gap-1 p-2 min-w-16 transition-colors ${
+                  location === item.href
+                    ? "text-foreground"
+                    : "text-muted-foreground"
                 }`}
               >
                 <span className="text-xs font-medium">{item.label}</span>

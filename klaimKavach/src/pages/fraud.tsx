@@ -96,14 +96,13 @@ export default function Fraud() {
     return (
       <div className="max-w-xl mx-auto w-full space-y-6">
         <Skeleton className="h-8 w-48 bg-card" />
-        <Skeleton className="h-[300px] w-full rounded-xl bg-card" />
+        <Skeleton className="h-75 w-full rounded-xl bg-card" />
       </div>
     );
   }
 
   if (!fraudData) return null;
 
-  const isVerified = fraudData.trustScore > 70;
   const isSuspicious = fraudData.trustScore <= 70 && fraudData.trustScore >= 30;
   const isFraud = fraudData.trustScore < 30;
 

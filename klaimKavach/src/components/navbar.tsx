@@ -22,11 +22,17 @@ export function Navbar() {
     <>
       {/* ── Public navbar (home, features, pricing, about) ── */}
       {isPublicPage && (
-        <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.05] bg-background/80 backdrop-blur-md">
+        <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-background/80 backdrop-blur-md">
           <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2 cursor-pointer">
-              <img src="/logo.jpg" alt="KlaimKavach" className="w-7 h-7 rounded-md object-contain" />
-              <span className="font-semibold text-sm tracking-tight text-foreground">KlaimKavach</span>
+              <img
+                src="/logo.jpg"
+                alt="KlaimKavach"
+                className="w-7 h-7 rounded-md object-contain"
+              />
+              <span className="font-semibold text-sm tracking-tight text-foreground">
+                KlaimKavach
+              </span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-6">
@@ -94,8 +100,14 @@ export function Navbar() {
         <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl h-16 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2 cursor-pointer">
-              <img src="/logo.jpg" alt="KlaimKavach" className="w-6 h-6 rounded-md object-contain" />
-              <span className="font-semibold text-sm tracking-tight text-foreground">KlaimKavach</span>
+              <img
+                src="/logo.jpg"
+                alt="KlaimKavach"
+                className="w-6 h-6 rounded-md object-contain"
+              />
+              <span className="font-semibold text-sm tracking-tight text-foreground">
+                KlaimKavach
+              </span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-6">
@@ -114,7 +126,11 @@ export function Navbar() {
                     <motion.div
                       layoutId="nav-underline"
                       className="absolute left-0 right-0 bottom-0 h-0.5 bg-foreground"
-                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30,
+                      }}
                     />
                   )}
                 </Link>

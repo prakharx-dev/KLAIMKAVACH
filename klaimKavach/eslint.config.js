@@ -1,12 +1,12 @@
 import globals from "globals";
 import pluginJs from "@eslint/js";
 import tseslint from "typescript-eslint";
-import pluginReactConfig from "eslint-plugin-react-hooks/configs/recommended.js";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
 
 export default [
-  {files: ["**/*.{ts,tsx}"]},
-  {languageOptions: { globals: {...globals.browser, ...globals.node} }},
+  { files: ["**/*.{ts,tsx}"] },
+  { languageOptions: { globals: { ...globals.browser, ...globals.node } } },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
-  pluginReactConfig,
+  reactHooksPlugin.configs.flat["recommended-latest"],
 ];
