@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
 import { ErrorBoundary } from "react-error-boundary";
@@ -9,7 +9,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { Layout } from "@/components/layout";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 
 const Home = lazy(() => import("@/pages/home"));
 const Features = lazy(() => import("@/pages/features"));
@@ -19,6 +19,7 @@ const Register = lazy(() => import("@/pages/register"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
 const Claim = lazy(() => import("@/pages/claim"));
 const Fraud = lazy(() => import("@/pages/fraud"));
+const Admin = lazy(() => import("@/pages/admin"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient({
@@ -29,6 +30,21 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+/* ── Route guards ── */
+function AdminRoute() {
+  const { isAuthenticated, isAdmin } = useAuth();
+  if (!isAuthenticated) return <Redirect to="/register" />;
+  if (!isAdmin) return <Redirect to="/dashboard" />;
+  return <Admin />;
+}
+
+function GigworkerRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, isAdmin } = useAuth();
+  if (!isAuthenticated) return <Redirect to="/register" />;
+  if (isAdmin) return <Redirect to="/admin" />;
+  return <Component />;
+}
 
 function RouteHandler() {
   const [location] = useLocation();
@@ -43,9 +59,10 @@ function RouteHandler() {
             <Route path="/pricing" component={Pricing} />
             <Route path="/about" component={About} />
             <Route path="/register" component={Register} />
-            <Route path="/dashboard" component={Dashboard} />
-            <Route path="/claim" component={Claim} />
-            <Route path="/fraud" component={Fraud} />
+            <Route path="/dashboard"><GigworkerRoute component={Dashboard} /></Route>
+            <Route path="/claim"><GigworkerRoute component={Claim} /></Route>
+            <Route path="/fraud"><GigworkerRoute component={Fraud} /></Route>
+            <Route path="/admin"><AdminRoute /></Route>
             <Route component={NotFound} />
           </Switch>
         </AnimatePresence>

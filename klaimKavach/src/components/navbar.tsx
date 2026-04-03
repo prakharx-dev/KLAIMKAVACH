@@ -1,17 +1,19 @@
 import { Link, useLocation } from "wouter";
-import { Shield, User, LogOut } from "lucide-react";
+import { Shield, User, LogOut, Settings } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 
 export function Navbar() {
   const [location] = useLocation();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, isAdmin, logout } = useAuth();
 
-  const appNavItems = [
-    { href: "/dashboard", label: "Dashboard" },
-    { href: "/claim", label: "Claim" },
-    { href: "/fraud", label: "Trust Score" },
-  ];
+  const appNavItems = isAdmin
+    ? [{ href: "/admin", label: "Admin Panel" }]
+    : [
+        { href: "/dashboard", label: "Dashboard" },
+        { href: "/claim", label: "Claim" },
+        { href: "/fraud", label: "Trust Score" },
+      ];
 
   const publicPages = ["/", "/features", "/pricing", "/about"];
   const isPublicPage = publicPages.includes(location);
@@ -58,9 +60,9 @@ export function Navbar() {
             <div className="flex items-center gap-3">
               {isAuthenticated ? (
                 <>
-                  <Link href="/dashboard">
+                  <Link href={isAdmin ? "/admin" : "/dashboard"}>
                     <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                      Dashboard
+                      {isAdmin ? "Admin Panel" : "Dashboard"}
                     </span>
                   </Link>
                   <motion.button

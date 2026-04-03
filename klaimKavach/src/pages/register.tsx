@@ -1,10 +1,10 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useRegisterUser } from "@workspace/api-client-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
   ArrowRight,
@@ -12,11 +12,14 @@ import {
   CheckCircle2,
   Zap,
   Lock,
+  Bike,
+  ShieldCheck,
 } from "lucide-react";
+import type { UserRole } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/hooks/use-auth";
-import { isPlanId, plansById } from "@/lib/plans";
+import { isPlanId, plansById, type PlanId } from "@/lib/plans";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,8 +29,8 @@ const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email"),
   phone: z.string().min(10, "Please enter a valid phone number"),
-  vehicle: z.string().min(2, "Please enter your vehicle type"),
-  city: z.string().min(2, "Please enter your city"),
+  vehicle: z.string().optional(),
+  city: z.string().optional(),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -44,6 +47,7 @@ export default function Register() {
   const { toast } = useToast();
   const { mutate: register, isPending } = useRegisterUser();
   const { login, selectedPlan } = useAuth();
+  const [selectedRole, setSelectedRole] = useState<UserRole>("gigworker");
 
   const selectedPlanId = useMemo(() => {
     if (typeof window === "undefined") return selectedPlan;
@@ -67,16 +71,24 @@ export default function Register() {
   });
 
   const onSubmit = (data: RegisterFormValues) => {
+    const payload = {
+      ...data,
+      vehicle: data.vehicle ?? "",
+      city: data.city ?? "",
+    };
     register(
-      { data },
+      { data: payload },
       {
         onSuccess: () => {
-          login(data.name, selectedPlanId ?? undefined);
+          const finalPlanId = selectedPlanId ?? "pro"; // Default to pro if none selected
+          login(data.name, selectedRole, finalPlanId as PlanId);
           toast({
-            title: "Welcome to KlaimKavach",
-            description: `Your ${selectedPlanName} plan is now active.`,
+            title: selectedRole === "admin" ? "Welcome, Admin" : "Welcome to KlaimKavach",
+            description: selectedRole === "admin"
+              ? "You're now logged in as an administrator."
+              : `Your ${plansById[finalPlanId as PlanId].name} plan is now active.`,
           });
-          setLocation("/dashboard");
+          setLocation(selectedRole === "admin" ? "/admin" : "/dashboard");
         },
         onError: (error: any) => {
           toast({
@@ -212,6 +224,45 @@ export default function Register() {
             )}
           </div>
 
+          {/* Role selector */}
+          <div className="mb-6">
+            <Label className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2 block">
+              I am a
+            </Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedRole("gigworker")}
+                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all duration-200 text-left ${
+                  selectedRole === "gigworker"
+                    ? "border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.1)]"
+                    : "border-[#222] bg-[#111] hover:border-[#333]"
+                }`}
+              >
+                <Bike className={`w-5 h-5 shrink-0 ${selectedRole === "gigworker" ? "text-emerald-400" : "text-muted-foreground"}`} />
+                <div>
+                  <p className={`text-sm font-semibold ${selectedRole === "gigworker" ? "text-foreground" : "text-muted-foreground"}`}>Gig Worker</p>
+                  <p className="text-[10px] text-muted-foreground">Driver / Rider</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRole("admin")}
+                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all duration-200 text-left ${
+                  selectedRole === "admin"
+                    ? "border-violet-500/60 bg-violet-500/10 shadow-[0_0_20px_rgba(139,92,246,0.1)]"
+                    : "border-[#222] bg-[#111] hover:border-[#333]"
+                }`}
+              >
+                <ShieldCheck className={`w-5 h-5 shrink-0 ${selectedRole === "admin" ? "text-violet-400" : "text-muted-foreground"}`} />
+                <div>
+                  <p className={`text-sm font-semibold ${selectedRole === "admin" ? "text-foreground" : "text-muted-foreground"}`}>Admin</p>
+                  <p className="text-[10px] text-muted-foreground">Manager / Ops</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div className="space-y-1.5">
@@ -275,47 +326,57 @@ export default function Register() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="vehicle"
-                  className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+            <AnimatePresence mode="popLayout" initial={false}>
+              {selectedRole === "gigworker" && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, height: "auto", filter: "blur(0px)" }}
+                  exit={{ opacity: 0, height: 0, filter: "blur(4px)" }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                  className="grid grid-cols-2 gap-4 overflow-hidden"
                 >
-                  Vehicle
-                </Label>
-                <Input
-                  id="vehicle"
-                  placeholder="2-Wheeler (EV)"
-                  className="h-11 bg-[#111] border-[#222] text-foreground placeholder:text-white/20 focus-visible:border-white/40 focus-visible:ring-0 rounded-lg"
-                  {...formRegister("vehicle")}
-                />
-                {errors.vehicle && (
-                  <p className="text-xs text-destructive">
-                    {errors.vehicle.message}
-                  </p>
-                )}
-              </div>
+                  <div className="space-y-1.5 pt-1">
+                    <Label
+                      htmlFor="vehicle"
+                      className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+                    >
+                      Vehicle
+                    </Label>
+                    <Input
+                      id="vehicle"
+                      placeholder="2-Wheeler (EV)"
+                      className="h-11 bg-[#111] border-[#222] text-foreground placeholder:text-white/20 focus-visible:border-white/40 focus-visible:ring-0 rounded-lg"
+                      {...formRegister("vehicle")}
+                    />
+                    {errors.vehicle && (
+                      <p className="text-xs text-destructive">
+                        {errors.vehicle.message}
+                      </p>
+                    )}
+                  </div>
 
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="city"
-                  className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
-                >
-                  City
-                </Label>
-                <Input
-                  id="city"
-                  placeholder="Bengaluru"
-                  className="h-11 bg-[#111] border-[#222] text-foreground placeholder:text-white/20 focus-visible:border-white/40 focus-visible:ring-0 rounded-lg"
-                  {...formRegister("city")}
-                />
-                {errors.city && (
-                  <p className="text-xs text-destructive">
-                    {errors.city.message}
-                  </p>
-                )}
-              </div>
-            </div>
+                  <div className="space-y-1.5 pt-1">
+                    <Label
+                      htmlFor="city"
+                      className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
+                    >
+                      City
+                    </Label>
+                    <Input
+                      id="city"
+                      placeholder="Bengaluru"
+                      className="h-11 bg-[#111] border-[#222] text-foreground placeholder:text-white/20 focus-visible:border-white/40 focus-visible:ring-0 rounded-lg"
+                      {...formRegister("city")}
+                    />
+                    {errors.city && (
+                      <p className="text-xs text-destructive">
+                        {errors.city.message}
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <Button
               type="submit"

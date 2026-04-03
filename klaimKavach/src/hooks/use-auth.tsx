@@ -2,16 +2,20 @@ import {
   useState,
   createContext,
   useContext,
-  useEffect,
   ReactNode,
 } from "react";
 import { PlanId, isPlanId } from "@/lib/plans";
 
+export type UserRole = "admin" | "gigworker";
+
 interface AuthContextType {
   user: string | null;
+  role: UserRole | null;
   selectedPlan: PlanId | null;
   isAuthenticated: boolean;
-  login: (name: string, planId?: PlanId) => void;
+  isAdmin: boolean;
+  isGigworker: boolean;
+  login: (name: string, role: UserRole, planId?: PlanId) => void;
   selectPlan: (planId: PlanId) => void;
   logout: () => void;
 }
@@ -31,6 +35,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     return false;
   });
+  const [role, setRole] = useState<UserRole | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("klaimkavach_role");
+      return saved === "admin" || saved === "gigworker" ? saved : null;
+    }
+    return null;
+  });
   const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(() => {
     if (typeof window !== "undefined") {
       const savedPlan = localStorage.getItem("klaimkavach_plan");
@@ -39,13 +50,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
-  const login = (name: string, planId?: PlanId) => {
+  const login = (name: string, userRole: UserRole, planId?: PlanId) => {
     localStorage.setItem("klaimkavach_user", name);
+    localStorage.setItem("klaimkavach_role", userRole);
     if (planId) {
       localStorage.setItem("klaimkavach_plan", planId);
       setSelectedPlan(planId);
     }
     setUser(name);
+    setRole(userRole);
     setIsAuthenticated(true);
   };
 
@@ -57,14 +70,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem("klaimkavach_user");
     localStorage.removeItem("klaimkavach_plan");
+    localStorage.removeItem("klaimkavach_role");
     setUser(null);
     setSelectedPlan(null);
+    setRole(null);
     setIsAuthenticated(false);
   };
 
+  const isAdmin = role === "admin";
+  const isGigworker = role === "gigworker";
+
   return (
     <AuthContext.Provider
-      value={{ user, selectedPlan, isAuthenticated, login, selectPlan, logout }}
+      value={{ user, role, selectedPlan, isAuthenticated, isAdmin, isGigworker, login, selectPlan, logout }}
     >
       {children}
     </AuthContext.Provider>

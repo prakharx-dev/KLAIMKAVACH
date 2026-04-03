@@ -2,15 +2,20 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/navbar";
+import { useAuth } from "@/hooks/use-auth";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
 
-  const appNavItems = [
-    { href: "/dashboard", label: "Dashboard" },
-    { href: "/claim", label: "Claim" },
-    { href: "/fraud", label: "Trust Score" },
-  ];
+  const { isAdmin } = useAuth();
+
+  const appNavItems = isAdmin
+    ? [{ href: "/admin", label: "Admin Panel" }]
+    : [
+        { href: "/dashboard", label: "Dashboard" },
+        { href: "/claim", label: "Claim" },
+        { href: "/fraud", label: "Trust Score" },
+      ];
 
   const publicPages = ["/", "/features", "/pricing", "/about"];
   const isPublicPage = publicPages.includes(location);
@@ -24,7 +29,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* ── Main content ── */}
       <main
-        className={`flex-1 flex flex-col ${isAppPage ? "container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl py-10" : ""} ${isPublicPage && !isHomePage ? "pt-14" : ""}`}
+        className={`flex-1 flex flex-col ${isAppPage ? "container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl py-8" : ""} ${isPublicPage && !isHomePage ? "pt-14" : ""}`}
       >
         <motion.div
           key={location}

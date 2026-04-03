@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;0,14..32,900;1,14..32,400&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -47,60 +47,111 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  
+
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 }
 
 :root {
   color-scheme: dark;
-  --background: 0 0% 4%;
+  /* Deeper pure dark background for premium feel */
+  --background: 220 22% 5%;
   --foreground: 0 0% 96%;
-  
-  --border: 0 0% 12%;
-  --input: 0 0% 12%;
+
+  --border: 220 14% 11%;
+  --input: 220 14% 11%;
   --ring: 0 0% 96%;
-  
-  --card: 0 0% 7%; 
+
+  --card: 220 20% 7%;
   --card-foreground: 0 0% 96%;
-  --card-border: 0 0% 12%;
-  
-  --popover: 0 0% 7%;
+  --card-border: 220 14% 11%;
+
+  --popover: 220 20% 7%;
   --popover-foreground: 0 0% 96%;
-  --popover-border: 0 0% 12%;
-  
+  --popover-border: 220 14% 11%;
+
   --primary: 0 0% 96%;
-  --primary-foreground: 0 0% 4%;
-  
-  --secondary: 0 0% 12%;
+  --primary-foreground: 220 22% 5%;
+
+  --secondary: 220 13% 13%;
   --secondary-foreground: 0 0% 96%;
-  
-  --muted: 0 0% 12%;
-  --muted-foreground: 0 0% 45%;
-  
+
+  --muted: 220 13% 13%;
+  --muted-foreground: 0 0% 42%;
+
   --accent: 217 91% 60%;
   --accent-foreground: 0 0% 100%;
-  
+
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
-  
-  --radius: 0.75rem;
+
+  --radius: 1rem;
+
+  /* Neon accent palette */
+  --neon-green: #10b981;
+  --neon-blue: #3b82f6;
+  --neon-orange: #f97316;
+  --neon-purple: #8b5cf6;
+  --neon-amber: #f59e0b;
+  --neon-teal: #14b8a6;
 }
 
 @layer base {
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground antialiased font-sans selection:bg-primary/30;
+
+  html {
+    scroll-behavior: smooth;
   }
+
+  body {
+    @apply bg-background text-foreground antialiased font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "kern" 1, "liga" 1, "tnum" 0;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-display tracking-tight font-semibold;
+  }
+
+  ::selection {
+    background-color: rgba(16, 185, 129, 0.22);
+    color: #fff;
+  }
+
+  /* Custom dark scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
   }
 }
 
 @layer utilities {
   .glass-panel {
     @apply bg-card border border-border shadow-sm;
+  }
+
+  /* Neon text-shadow glow helpers */
+  .glow-green  { text-shadow: 0 0 22px rgba(16,185,129,0.55); }
+  .glow-blue   { text-shadow: 0 0 22px rgba(59,130,246,0.55); }
+  .glow-orange { text-shadow: 0 0 22px rgba(249,115,22,0.55); }
+  .glow-purple { text-shadow: 0 0 22px rgba(139,92,246,0.55); }
+
+  /* Force tabular numerals on any element */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
   }
 }
