@@ -2,23 +2,55 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import {
-  Users, CreditCard, AlertTriangle, CloudLightning, Wallet,
-  LayoutDashboard, TrendingUp, TrendingDown, ArrowUpRight,
-  Search, Bell, ChevronDown, Shield, BarChart3, Settings,
-  LogOut, Menu, X, Eye, CheckCircle2, XCircle, Clock,
-  DollarSign, Activity, Zap
+  Users,
+  CreditCard,
+  AlertTriangle,
+  CloudLightning,
+  Wallet,
+  LayoutDashboard,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  Search,
+  Bell,
+  ChevronDown,
+  Shield,
+  BarChart3,
+  LogOut,
+  Menu,
+  X,
+  Eye,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  DollarSign,
+  Activity,
+  Zap,
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 import { Helmet } from "react-helmet-async";
 
 /* ───────── Mock Data ───────── */
 const userGrowth = [
-  { month: "Sep", users: 820 }, { month: "Oct", users: 1240 },
-  { month: "Nov", users: 1580 }, { month: "Dec", users: 2100 },
-  { month: "Jan", users: 2780 }, { month: "Feb", users: 3450 },
+  { month: "Sep", users: 820 },
+  { month: "Oct", users: 1240 },
+  { month: "Nov", users: 1580 },
+  { month: "Dec", users: 2100 },
+  { month: "Jan", users: 2780 },
+  { month: "Feb", users: 3450 },
   { month: "Mar", users: 4120 },
 ];
 
@@ -29,36 +61,254 @@ const subsByPlan = [
 ];
 
 const revenueData = [
-  { month: "Sep", revenue: 12400 }, { month: "Oct", revenue: 18600 },
-  { month: "Nov", revenue: 22100 }, { month: "Dec", revenue: 28500 },
-  { month: "Jan", revenue: 34200 }, { month: "Feb", revenue: 41800 },
+  { month: "Sep", revenue: 12400 },
+  { month: "Oct", revenue: 18600 },
+  { month: "Nov", revenue: 22100 },
+  { month: "Dec", revenue: 28500 },
+  { month: "Jan", revenue: 34200 },
+  { month: "Feb", revenue: 41800 },
   { month: "Mar", revenue: 48600 },
 ];
 
 const disruptions = [
-  { id: 1, type: "Flight Delay", location: "DEL → BOM", severity: "high", status: "active", time: "12 min ago", affected: 142 },
-  { id: 2, type: "Weather Alert", location: "Mumbai Region", severity: "medium", status: "active", time: "28 min ago", affected: 89 },
-  { id: 3, type: "Train Cancel", location: "Rajdhani Express", severity: "high", status: "monitoring", time: "1h ago", affected: 234 },
-  { id: 4, type: "Road Closure", location: "NH-48 Gurugram", severity: "low", status: "resolved", time: "3h ago", affected: 56 },
-  { id: 5, type: "Flight Cancel", location: "BLR → HYD", severity: "high", status: "active", time: "45 min ago", affected: 198 },
+  {
+    id: 1,
+    type: "Weather Alert",
+    location: "Mumbai Region",
+    severity: "high",
+    status: "active",
+    time: "12 min ago",
+    affected: 142,
+  },
+  {
+    id: 2,
+    type: "AQI Spike",
+    location: "Delhi NCR",
+    severity: "medium",
+    status: "monitoring",
+    time: "28 min ago",
+    affected: 89,
+  },
+  {
+    id: 3,
+    type: "Traffic Surge",
+    location: "NH-48 Gurugram",
+    severity: "high",
+    status: "active",
+    time: "45 min ago",
+    affected: 198,
+  },
 ];
 
 const payouts = [
-  { id: "PAY-2847", user: "Arjun Mehta", amount: 12500, status: "completed", date: "Mar 28, 2026", method: "UPI" },
-  { id: "PAY-2846", user: "Priya Sharma", amount: 8200, status: "processing", date: "Mar 27, 2026", method: "Bank" },
-  { id: "PAY-2845", user: "Vikram Singh", amount: 45000, status: "completed", date: "Mar 27, 2026", method: "UPI" },
-  { id: "PAY-2844", user: "Sneha Patel", amount: 3400, status: "failed", date: "Mar 26, 2026", method: "Bank" },
-  { id: "PAY-2843", user: "Rahul Kumar", amount: 15800, status: "completed", date: "Mar 26, 2026", method: "UPI" },
-  { id: "PAY-2842", user: "Ananya Desai", amount: 22000, status: "processing", date: "Mar 25, 2026", method: "Bank" },
+  {
+    id: "PAY-2847",
+    user: "Arjun Mehta",
+    amount: 12500,
+    status: "completed",
+    date: "Mar 28, 2026",
+    method: "UPI",
+  },
+  {
+    id: "PAY-2846",
+    user: "Priya Sharma",
+    amount: 8200,
+    status: "processing",
+    date: "Mar 27, 2026",
+    method: "Bank",
+  },
+  {
+    id: "PAY-2845",
+    user: "Vikram Singh",
+    amount: 45000,
+    status: "completed",
+    date: "Mar 27, 2026",
+    method: "UPI",
+  },
+  {
+    id: "PAY-2844",
+    user: "Sneha Patel",
+    amount: 3400,
+    status: "failed",
+    date: "Mar 26, 2026",
+    method: "Bank",
+  },
+  {
+    id: "PAY-2843",
+    user: "Rahul Kumar",
+    amount: 15800,
+    status: "completed",
+    date: "Mar 26, 2026",
+    method: "UPI",
+  },
+  {
+    id: "PAY-2842",
+    user: "Ananya Desai",
+    amount: 22000,
+    status: "processing",
+    date: "Mar 25, 2026",
+    method: "Bank",
+  },
 ];
 
 const fraudAlerts = [
-  { id: 1, user: "user_x892", type: "Duplicate Claim", risk: 92, desc: "Same disruption claimed 3x from different accounts", time: "5 min ago", status: "unreviewed" },
-  { id: 2, user: "user_k421", type: "Velocity Abuse", risk: 87, desc: "14 claims in 48 hours — abnormal pattern", time: "18 min ago", status: "unreviewed" },
-  { id: 3, user: "user_m133", type: "Identity Mismatch", risk: 78, desc: "KYC data doesn't match booking details", time: "1h ago", status: "investigating" },
-  { id: 4, user: "user_p567", type: "GPS Spoofing", risk: 95, desc: "Location data inconsistent with claimed disruption", time: "2h ago", status: "flagged" },
-  { id: 5, user: "user_r901", type: "Synthetic ID", risk: 88, desc: "Account matches synthetic identity patterns", time: "4h ago", status: "investigating" },
+  {
+    id: 1,
+    user: "user_x892",
+    type: "Duplicate Claim",
+    risk: 92,
+    desc: "Same disruption claimed 3x from different accounts",
+    time: "5 min ago",
+    status: "unreviewed",
+  },
+  {
+    id: 2,
+    user: "user_k421",
+    type: "Velocity Abuse",
+    risk: 87,
+    desc: "14 claims in 48 hours — abnormal pattern",
+    time: "18 min ago",
+    status: "unreviewed",
+  },
+  {
+    id: 3,
+    user: "user_m133",
+    type: "Identity Mismatch",
+    risk: 78,
+    desc: "KYC data doesn't match booking details",
+    time: "1h ago",
+    status: "investigating",
+  },
+  {
+    id: 4,
+    user: "user_p567",
+    type: "GPS Spoofing",
+    risk: 95,
+    desc: "Location data inconsistent with claimed disruption",
+    time: "2h ago",
+    status: "flagged",
+  },
+  {
+    id: 5,
+    user: "user_r901",
+    type: "Synthetic ID",
+    risk: 88,
+    desc: "Account matches synthetic identity patterns",
+    time: "4h ago",
+    status: "investigating",
+  },
 ];
+
+const userDirectory = [
+  {
+    id: "USR-1042",
+    name: "Arjun Mehta",
+    city: "Mumbai",
+    plan: "Pro",
+    status: "active",
+    claims: 12,
+    joinDate: "Jan 14, 2026",
+  },
+  {
+    id: "USR-1036",
+    name: "Priya Sharma",
+    city: "Delhi",
+    plan: "Basic",
+    status: "active",
+    claims: 7,
+    joinDate: "Dec 21, 2025",
+  },
+  {
+    id: "USR-1019",
+    name: "Vikram Singh",
+    city: "Bengaluru",
+    plan: "Enterprise",
+    status: "monitoring",
+    claims: 18,
+    joinDate: "Nov 02, 2025",
+  },
+  {
+    id: "USR-0997",
+    name: "Sneha Patel",
+    city: "Ahmedabad",
+    plan: "Pro",
+    status: "inactive",
+    claims: 3,
+    joinDate: "Sep 28, 2025",
+  },
+  {
+    id: "USR-0982",
+    name: "Rahul Kumar",
+    city: "Lucknow",
+    plan: "Basic",
+    status: "active",
+    claims: 9,
+    joinDate: "Aug 17, 2025",
+  },
+];
+
+const monthlyClaims = [
+  { month: "Sep", approved: 82, rejected: 11 },
+  { month: "Oct", approved: 97, rejected: 14 },
+  { month: "Nov", approved: 112, rejected: 16 },
+  { month: "Dec", approved: 138, rejected: 21 },
+  { month: "Jan", approved: 151, rejected: 25 },
+  { month: "Feb", approved: 174, rejected: 29 },
+  { month: "Mar", approved: 193, rejected: 27 },
+];
+
+const disruptionImpact = [
+  { type: "Weather", affected: 142, incomeLoss: 24 },
+  { type: "AQI", affected: 89, incomeLoss: 16 },
+  { type: "Traffic", affected: 198, incomeLoss: 29 },
+];
+
+const subscriptionTrend = [
+  { month: "Sep", active: 1680, churned: 66 },
+  { month: "Oct", active: 1825, churned: 71 },
+  { month: "Nov", active: 1970, churned: 74 },
+  { month: "Dec", active: 2140, churned: 79 },
+  { month: "Jan", active: 2285, churned: 83 },
+  { month: "Feb", active: 2368, churned: 86 },
+  { month: "Mar", active: 2450, churned: 81 },
+];
+
+const planPerformance = [
+  { plan: "Basic", subscribers: 1240, mrr: 136400, renewals: "88%" },
+  { plan: "Pro", subscribers: 890, mrr: 195800, renewals: "93%" },
+  { plan: "Enterprise", subscribers: 320, mrr: 176000, renewals: "95%" },
+];
+
+const adminNotifications = [
+  {
+    id: "N-1",
+    title: "New high-risk fraud alert",
+    detail: "GPS Spoofing detected for user_p567",
+    time: "2 min ago",
+    section: "fraud",
+  },
+  {
+    id: "N-2",
+    title: "Weather disruption spike",
+    detail: "142 gigworkers impacted in Mumbai",
+    time: "10 min ago",
+    section: "disruptions",
+  },
+  {
+    id: "N-3",
+    title: "Payout batch partially failed",
+    detail: "1 payout needs retry in latest batch",
+    time: "25 min ago",
+    section: "payouts",
+  },
+  {
+    id: "N-4",
+    title: "Subscription upgrade surge",
+    detail: "38 upgrades from Basic to Pro today",
+    time: "1h ago",
+    section: "subs",
+  },
+] as const;
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview", id: "overview" },
@@ -68,7 +318,6 @@ const sidebarItems = [
   { icon: Wallet, label: "Payouts", id: "payouts" },
   { icon: AlertTriangle, label: "Fraud Alerts", id: "fraud" },
   { icon: BarChart3, label: "Analytics", id: "analytics" },
-  { icon: Settings, label: "Settings", id: "settings" },
 ];
 
 /* ───────── Helpers ───────── */
@@ -78,29 +327,58 @@ const severityColor: Record<string, string> = {
   low: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
 };
 const statusColor: Record<string, string> = {
-  active: "text-red-400", monitoring: "text-amber-400", resolved: "text-emerald-400",
-  completed: "text-emerald-400", processing: "text-amber-400", failed: "text-red-400",
-  unreviewed: "text-red-400", investigating: "text-amber-400", flagged: "text-orange-400",
+  active: "text-red-400",
+  monitoring: "text-amber-400",
+  resolved: "text-emerald-400",
+  completed: "text-emerald-400",
+  processing: "text-amber-400",
+  failed: "text-red-400",
+  unreviewed: "text-red-400",
+  investigating: "text-amber-400",
+  flagged: "text-orange-400",
 };
 const statusIcon: Record<string, typeof CheckCircle2> = {
-  completed: CheckCircle2, processing: Clock, failed: XCircle,
+  completed: CheckCircle2,
+  processing: Clock,
+  failed: XCircle,
 };
 
-function StatCard({ icon: Icon, label, value, change, changeType, accent }: {
-  icon: typeof Users; label: string; value: string; change: string; changeType: "up" | "down"; accent: string;
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  change,
+  changeType,
+  accent,
+}: {
+  icon: typeof Users;
+  label: string;
+  value: string;
+  change: string;
+  changeType: "up" | "down";
+  accent: string;
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       className="glass-panel rounded-2xl p-5 relative overflow-hidden group hover:border-white/10 transition-all duration-300"
     >
-      <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl opacity-10 ${accent}`} />
+      <div
+        className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl opacity-10 ${accent}`}
+      />
       <div className="flex items-start justify-between mb-3">
         <div className={`p-2.5 rounded-xl bg-white/5 border border-white/5`}>
           <Icon className="w-4 h-4 text-muted-foreground" />
         </div>
-        <span className={`flex items-center gap-1 text-xs font-medium ${changeType === "up" ? "text-emerald-400" : "text-red-400"}`}>
-          {changeType === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+        <span
+          className={`flex items-center gap-1 text-xs font-medium ${changeType === "up" ? "text-emerald-400" : "text-red-400"}`}
+        >
+          {changeType === "up" ? (
+            <TrendingUp className="w-3 h-3" />
+          ) : (
+            <TrendingDown className="w-3 h-3" />
+          )}
           {change}
         </span>
       </div>
@@ -114,27 +392,50 @@ function StatCard({ icon: Icon, label, value, change, changeType, accent }: {
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(4);
+
+  const handleNotificationToggle = () => {
+    setIsNotificationOpen((prev) => {
+      const next = !prev;
+      if (next) setUnreadCount(0);
+      return next;
+    });
+  };
+
+  const handleNotificationClick = (section: string) => {
+    setActiveSection(section);
+    setIsNotificationOpen(false);
+  };
 
   return (
     <>
       <Helmet>
         <title>Admin Panel — KlaimKavach</title>
-        <meta name="description" content="KlaimKavach admin dashboard for managing users, subscriptions, disruptions, payouts, and fraud alerts." />
+        <meta
+          name="description"
+          content="KlaimKavach admin dashboard for managing users, subscriptions, disruptions, payouts, and fraud alerts."
+        />
       </Helmet>
 
       <div className="flex min-h-[calc(100vh-4rem)] -mx-4 sm:-mx-6 lg:-mx-8 -my-8">
         {/* ── Sidebar ── */}
         {sidebarOpen && (
-          <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+          <div
+            className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
         )}
-        <aside className={`
+        <aside
+          className={`
           fixed lg:sticky top-16 left-0 z-50 lg:z-auto h-[calc(100vh-4rem)] w-64 border-r border-border bg-background
           flex flex-col transition-transform duration-300
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-        `}>
+        `}
+        >
           <div className="p-4 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
                 <Shield className="w-4 h-4 text-white" />
               </div>
               <div>
@@ -142,7 +443,10 @@ export default function AdminDashboard() {
                 <p className="text-[10px] text-muted-foreground">KlaimKavach</p>
               </div>
             </div>
-            <button className="lg:hidden p-1" onClick={() => setSidebarOpen(false)}>
+            <button
+              className="lg:hidden p-1"
+              onClick={() => setSidebarOpen(false)}
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -151,7 +455,10 @@ export default function AdminDashboard() {
             {sidebarItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => { setActiveSection(item.id); setSidebarOpen(false); }}
+                onClick={() => {
+                  setActiveSection(item.id);
+                  setSidebarOpen(false);
+                }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                   activeSection === item.id
                     ? "bg-white/10 text-foreground shadow-sm"
@@ -161,7 +468,9 @@ export default function AdminDashboard() {
                 <item.icon className="w-4 h-4" />
                 {item.label}
                 {item.id === "fraud" && (
-                  <span className="ml-auto bg-red-500/20 text-red-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">5</span>
+                  <span className="ml-auto bg-red-500/20 text-red-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    5
+                  </span>
                 )}
                 {item.id === "disruptions" && (
                   <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -184,78 +493,232 @@ export default function AdminDashboard() {
           {/* Top bar */}
           <div className="sticky top-16 z-30 bg-background/80 backdrop-blur-md border-b border-border px-6 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button className="lg:hidden p-2 rounded-lg hover:bg-white/5" onClick={() => setSidebarOpen(true)}>
+              <button
+                className="lg:hidden p-2 rounded-lg hover:bg-white/5"
+                onClick={() => setSidebarOpen(true)}
+              >
                 <Menu className="w-5 h-5" />
               </button>
-              <h1 className="text-lg font-semibold capitalize">{activeSection === "subs" ? "Subscriptions" : activeSection}</h1>
+              <h1 className="text-lg font-semibold capitalize">
+                {activeSection === "subs" ? "Subscriptions" : activeSection}
+              </h1>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
                 <Search className="w-4 h-4 text-muted-foreground" />
-                <input placeholder="Search..." className="bg-transparent text-sm outline-none w-40 placeholder:text-muted-foreground" />
+                <input
+                  placeholder="Search..."
+                  className="bg-transparent text-sm outline-none w-40 placeholder:text-muted-foreground"
+                />
               </div>
-              <button className="relative p-2 rounded-xl hover:bg-white/5 transition-colors">
-                <Bell className="w-4 h-4 text-muted-foreground" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={handleNotificationToggle}
+                  className="relative p-2 rounded-xl hover:bg-white/5 transition-colors"
+                  aria-label="Open notifications"
+                >
+                  <Bell className="w-4 h-4 text-muted-foreground" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-[10px] leading-4 text-white font-semibold text-center">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {isNotificationOpen && (
+                  <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/10 bg-[#0f1117] shadow-2xl z-50 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                      <p className="text-sm font-semibold">Notifications</p>
+                      <button
+                        onClick={() => setIsNotificationOpen(false)}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {adminNotifications.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => handleNotificationClick(n.section)}
+                          className="w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors"
+                        >
+                          <p className="text-xs font-medium text-foreground">
+                            {n.title}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            {n.detail}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {n.time}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Content */}
           <div className="p-6">
             <AnimatePresence mode="wait">
-              <motion.div key={activeSection} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
-
+              <motion.div
+                key={activeSection}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
                 {/* ── OVERVIEW ── */}
-                {(activeSection === "overview" || activeSection === "users" || activeSection === "subs" || activeSection === "analytics" || activeSection === "settings") && (
+                {activeSection === "overview" && (
                   <div className="space-y-6">
                     {/* Stat Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                      <StatCard icon={Users} label="Total Users" value="4,120" change="+12.5%" changeType="up" accent="bg-blue-500" />
-                      <StatCard icon={CreditCard} label="Active Subscriptions" value="2,450" change="+8.2%" changeType="up" accent="bg-violet-500" />
-                      <StatCard icon={CloudLightning} label="Live Disruptions" value="3" change="-25%" changeType="down" accent="bg-amber-500" />
-                      <StatCard icon={DollarSign} label="Total Payouts" value="₹4.86L" change="+18.4%" changeType="up" accent="bg-emerald-500" />
+                      <StatCard
+                        icon={Users}
+                        label="Total Users"
+                        value="4,120"
+                        change="+12.5%"
+                        changeType="up"
+                        accent="bg-blue-500"
+                      />
+                      <StatCard
+                        icon={CreditCard}
+                        label="Active Subscriptions"
+                        value="2,450"
+                        change="+8.2%"
+                        changeType="up"
+                        accent="bg-violet-500"
+                      />
+                      <StatCard
+                        icon={CloudLightning}
+                        label="Live Disruptions"
+                        value={String(disruptions.length)}
+                        change="-25%"
+                        changeType="down"
+                        accent="bg-amber-500"
+                      />
+                      <StatCard
+                        icon={DollarSign}
+                        label="Total Payouts"
+                        value="₹4.86L"
+                        change="+18.4%"
+                        changeType="up"
+                        accent="bg-emerald-500"
+                      />
                     </div>
 
                     {/* Charts Row */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                       <div className="lg:col-span-2 glass-panel rounded-2xl p-5">
                         <div className="flex items-center justify-between mb-4">
-                          <h2 className="text-sm font-semibold">Revenue Overview</h2>
-                          <span className="text-xs text-muted-foreground">Last 7 months</span>
+                          <h2 className="text-sm font-semibold">
+                            Revenue Overview
+                          </h2>
+                          <span className="text-xs text-muted-foreground">
+                            Last 7 months
+                          </span>
                         </div>
                         <ResponsiveContainer width="100%" height={220}>
                           <AreaChart data={revenueData}>
                             <defs>
-                              <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                                <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                              <linearGradient
+                                id="revGrad"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="0%"
+                                  stopColor="#8b5cf6"
+                                  stopOpacity={0.3}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor="#8b5cf6"
+                                  stopOpacity={0}
+                                />
                               </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                            <XAxis dataKey="month" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v / 1000}k`} />
-                            <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }} />
-                            <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" fill="url(#revGrad)" strokeWidth={2} />
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="rgba(255,255,255,0.05)"
+                            />
+                            <XAxis
+                              dataKey="month"
+                              tick={{ fill: "#6b7280", fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              tick={{ fill: "#6b7280", fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                              tickFormatter={(v) => `₹${v / 1000}k`}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: "#1a1a2e",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                borderRadius: 12,
+                                fontSize: 12,
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="revenue"
+                              stroke="#8b5cf6"
+                              fill="url(#revGrad)"
+                              strokeWidth={2}
+                            />
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
 
                       <div className="glass-panel rounded-2xl p-5">
-                        <h2 className="text-sm font-semibold mb-4">Subscriptions by Plan</h2>
+                        <h2 className="text-sm font-semibold mb-4">
+                          Subscriptions by Plan
+                        </h2>
                         <ResponsiveContainer width="100%" height={180}>
                           <PieChart>
-                            <Pie data={subsByPlan} innerRadius={50} outerRadius={75} dataKey="value" paddingAngle={4} strokeWidth={0}>
-                              {subsByPlan.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
+                            <Pie
+                              data={subsByPlan}
+                              innerRadius={50}
+                              outerRadius={75}
+                              dataKey="value"
+                              paddingAngle={4}
+                              strokeWidth={0}
+                            >
+                              {subsByPlan.map((entry, i) => (
+                                <Cell key={i} fill={entry.color} />
+                              ))}
                             </Pie>
-                            <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }} />
+                            <Tooltip
+                              contentStyle={{
+                                background: "#1a1a2e",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                borderRadius: 12,
+                                fontSize: 12,
+                              }}
+                            />
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="flex justify-center gap-4 mt-2">
                           {subsByPlan.map((p) => (
-                            <div key={p.name} className="flex items-center gap-1.5">
-                              <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-                              <span className="text-[11px] text-muted-foreground">{p.name}</span>
+                            <div
+                              key={p.name}
+                              className="flex items-center gap-1.5"
+                            >
+                              <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ background: p.color }}
+                              />
+                              <span className="text-[11px] text-muted-foreground">
+                                {p.name}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -266,17 +729,556 @@ export default function AdminDashboard() {
                     <div className="glass-panel rounded-2xl p-5">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-semibold">User Growth</h2>
-                        <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium"><TrendingUp className="w-3 h-3" /> +402% YoY</span>
+                        <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
+                          <TrendingUp className="w-3 h-3" /> +402% YoY
+                        </span>
                       </div>
                       <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={userGrowth}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                          <XAxis dataKey="month" tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
-                          <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} axisLine={false} tickLine={false} />
-                          <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }} />
-                          <Bar dataKey="users" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="rgba(255,255,255,0.05)"
+                          />
+                          <XAxis
+                            dataKey="month"
+                            tick={{ fill: "#6b7280", fontSize: 11 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            tick={{ fill: "#6b7280", fontSize: 11 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: "#1a1a2e",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              borderRadius: 12,
+                              fontSize: 12,
+                            }}
+                          />
+                          <Bar
+                            dataKey="users"
+                            fill="#3b82f6"
+                            radius={[6, 6, 0, 0]}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── SUBSCRIPTIONS ── */}
+                {activeSection === "subs" && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                      <StatCard
+                        icon={CreditCard}
+                        label="Active Subscriptions"
+                        value="2,450"
+                        change="+8.2%"
+                        changeType="up"
+                        accent="bg-violet-500"
+                      />
+                      <StatCard
+                        icon={DollarSign}
+                        label="Monthly Recurring Revenue"
+                        value="₹5.08L"
+                        change="+10.6%"
+                        changeType="up"
+                        accent="bg-emerald-500"
+                      />
+                      <StatCard
+                        icon={TrendingDown}
+                        label="Monthly Churn"
+                        value="3.3%"
+                        change="-0.7%"
+                        changeType="down"
+                        accent="bg-amber-500"
+                      />
+                      <StatCard
+                        icon={TrendingUp}
+                        label="Upgrade Rate"
+                        value="14.9%"
+                        change="+2.2%"
+                        changeType="up"
+                        accent="bg-blue-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      <div className="lg:col-span-2 glass-panel rounded-2xl p-5">
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className="text-sm font-semibold">
+                            Subscription Trend
+                          </h2>
+                          <span className="text-xs text-muted-foreground">
+                            Active vs Churned
+                          </span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <AreaChart data={subscriptionTrend}>
+                            <defs>
+                              <linearGradient
+                                id="subsActiveGrad"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="0%"
+                                  stopColor="#8b5cf6"
+                                  stopOpacity={0.35}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor="#8b5cf6"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="rgba(255,255,255,0.05)"
+                            />
+                            <XAxis
+                              dataKey="month"
+                              tick={{ fill: "#6b7280", fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              tick={{ fill: "#6b7280", fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: "#1a1a2e",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                borderRadius: 12,
+                                fontSize: 12,
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="active"
+                              stroke="#8b5cf6"
+                              fill="url(#subsActiveGrad)"
+                              strokeWidth={2}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="churned"
+                              stroke="#ef4444"
+                              fill="transparent"
+                              strokeWidth={2}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      <div className="glass-panel rounded-2xl p-5">
+                        <h2 className="text-sm font-semibold mb-4">
+                          Plan Share
+                        </h2>
+                        <ResponsiveContainer width="100%" height={180}>
+                          <PieChart>
+                            <Pie
+                              data={subsByPlan}
+                              innerRadius={50}
+                              outerRadius={75}
+                              dataKey="value"
+                              paddingAngle={4}
+                              strokeWidth={0}
+                            >
+                              {subsByPlan.map((entry, i) => (
+                                <Cell key={i} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{
+                                background: "#1a1a2e",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                borderRadius: 12,
+                                fontSize: 12,
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="flex justify-center gap-4 mt-2">
+                          {subsByPlan.map((p) => (
+                            <div
+                              key={p.name}
+                              className="flex items-center gap-1.5"
+                            >
+                              <div
+                                className="w-2 h-2 rounded-full"
+                                style={{ background: p.color }}
+                              />
+                              <span className="text-[11px] text-muted-foreground">
+                                {p.name}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="glass-panel rounded-2xl overflow-hidden">
+                      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+                        <h2 className="text-sm font-semibold">
+                          Plan Performance
+                        </h2>
+                        <span className="text-xs text-muted-foreground">
+                          MRR and renewals by plan
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border text-muted-foreground">
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Plan
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Subscribers
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                MRR
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Renewal Rate
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {planPerformance.map((p, i) => (
+                              <motion.tr
+                                key={p.plan}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: i * 0.05 }}
+                                className="border-b border-border/50 hover:bg-white/2 transition-colors"
+                              >
+                                <td className="px-5 py-3 font-medium">
+                                  {p.plan}
+                                </td>
+                                <td className="px-5 py-3 tabular">
+                                  {p.subscribers.toLocaleString()}
+                                </td>
+                                <td className="px-5 py-3 tabular">
+                                  ₹{p.mrr.toLocaleString()}
+                                </td>
+                                <td className="px-5 py-3 text-emerald-400 font-medium">
+                                  {p.renewals}
+                                </td>
+                              </motion.tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── USERS ── */}
+                {activeSection === "users" && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                      <StatCard
+                        icon={Users}
+                        label="Registered Gigworkers"
+                        value="4,120"
+                        change="+12.5%"
+                        changeType="up"
+                        accent="bg-blue-500"
+                      />
+                      <StatCard
+                        icon={Shield}
+                        label="KYC Verified"
+                        value="3,860"
+                        change="+6.8%"
+                        changeType="up"
+                        accent="bg-emerald-500"
+                      />
+                      <StatCard
+                        icon={Activity}
+                        label="Active This Week"
+                        value="2,945"
+                        change="+4.1%"
+                        changeType="up"
+                        accent="bg-amber-500"
+                      />
+                      <StatCard
+                        icon={AlertTriangle}
+                        label="Accounts Monitoring"
+                        value="74"
+                        change="-9.2%"
+                        changeType="down"
+                        accent="bg-red-500"
+                      />
+                    </div>
+
+                    <div className="glass-panel rounded-2xl overflow-hidden">
+                      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+                        <h2 className="text-sm font-semibold">
+                          User Directory
+                        </h2>
+                        <span className="text-xs text-muted-foreground">
+                          Last updated 2 min ago
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border text-muted-foreground">
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                User ID
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Name
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                City
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Plan
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Claims
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Joined
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Status
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userDirectory.map((u, i) => (
+                              <motion.tr
+                                key={u.id}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: i * 0.05 }}
+                                className="border-b border-border/50 hover:bg-white/2 transition-colors"
+                              >
+                                <td className="px-5 py-3 font-mono text-xs text-muted-foreground">
+                                  {u.id}
+                                </td>
+                                <td className="px-5 py-3 font-medium">
+                                  {u.name}
+                                </td>
+                                <td className="px-5 py-3 text-muted-foreground">
+                                  {u.city}
+                                </td>
+                                <td className="px-5 py-3 text-muted-foreground">
+                                  {u.plan}
+                                </td>
+                                <td className="px-5 py-3 tabular">
+                                  {u.claims}
+                                </td>
+                                <td className="px-5 py-3 text-muted-foreground">
+                                  {u.joinDate}
+                                </td>
+                                <td className="px-5 py-3">
+                                  <span
+                                    className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${statusColor[u.status]}`}
+                                  >
+                                    {u.status}
+                                  </span>
+                                </td>
+                              </motion.tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── ANALYTICS ── */}
+                {activeSection === "analytics" && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                      <StatCard
+                        icon={CheckCircle2}
+                        label="Claim Approval Rate"
+                        value="86.7%"
+                        change="+2.1%"
+                        changeType="up"
+                        accent="bg-emerald-500"
+                      />
+                      <StatCard
+                        icon={Clock}
+                        label="Avg Processing Time"
+                        value="2.8h"
+                        change="-12.4%"
+                        changeType="down"
+                        accent="bg-blue-500"
+                      />
+                      <StatCard
+                        icon={Wallet}
+                        label="Payout Success Rate"
+                        value="96.2%"
+                        change="+1.6%"
+                        changeType="up"
+                        accent="bg-violet-500"
+                      />
+                      <StatCard
+                        icon={AlertTriangle}
+                        label="Fraud Catch Accuracy"
+                        value="91.4%"
+                        change="+3.4%"
+                        changeType="up"
+                        accent="bg-amber-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="glass-panel rounded-2xl p-5">
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className="text-sm font-semibold">
+                            Claims Trend
+                          </h2>
+                          <span className="text-xs text-muted-foreground">
+                            Approved vs Rejected
+                          </span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={230}>
+                          <AreaChart data={monthlyClaims}>
+                            <defs>
+                              <linearGradient
+                                id="approvedGrad"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="0%"
+                                  stopColor="#10b981"
+                                  stopOpacity={0.35}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor="#10b981"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                              <linearGradient
+                                id="rejectedGrad"
+                                x1="0"
+                                y1="0"
+                                x2="0"
+                                y2="1"
+                              >
+                                <stop
+                                  offset="0%"
+                                  stopColor="#ef4444"
+                                  stopOpacity={0.25}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor="#ef4444"
+                                  stopOpacity={0}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="rgba(255,255,255,0.05)"
+                            />
+                            <XAxis
+                              dataKey="month"
+                              tick={{ fill: "#6b7280", fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              tick={{ fill: "#6b7280", fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: "#1a1a2e",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                borderRadius: 12,
+                                fontSize: 12,
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="approved"
+                              stroke="#10b981"
+                              fill="url(#approvedGrad)"
+                              strokeWidth={2}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="rejected"
+                              stroke="#ef4444"
+                              fill="url(#rejectedGrad)"
+                              strokeWidth={2}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      <div className="glass-panel rounded-2xl p-5">
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className="text-sm font-semibold">
+                            Disruption Impact Analytics
+                          </h2>
+                          <span className="text-xs text-muted-foreground">
+                            Gigworker income impact
+                          </span>
+                        </div>
+                        <ResponsiveContainer width="100%" height={230}>
+                          <BarChart data={disruptionImpact}>
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="rgba(255,255,255,0.05)"
+                            />
+                            <XAxis
+                              dataKey="type"
+                              tick={{ fill: "#6b7280", fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              tick={{ fill: "#6b7280", fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                background: "#1a1a2e",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                borderRadius: 12,
+                                fontSize: 12,
+                              }}
+                            />
+                            <Bar
+                              dataKey="affected"
+                              name="Gigworkers Affected"
+                              fill="#3b82f6"
+                              radius={[6, 6, 0, 0]}
+                            />
+                            <Bar
+                              dataKey="incomeLoss"
+                              name="Avg Income Loss %"
+                              fill="#f59e0b"
+                              radius={[6, 6, 0, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -286,21 +1288,39 @@ export default function AdminDashboard() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 mb-2">
                       <Activity className="w-4 h-4 text-amber-400" />
-                      <span className="text-sm font-semibold">Live Disruption Feed</span>
+                      <span className="text-sm font-semibold">
+                        Live Disruption Feed
+                      </span>
                       <span className="ml-2 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                     </div>
                     {disruptions.map((d, i) => (
-                      <motion.div key={d.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}
+                      <motion.div
+                        key={d.id}
+                        initial={{ opacity: 0, x: -12 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.06 }}
                         className="glass-panel rounded-xl p-4 flex items-center justify-between gap-4 hover:border-white/10 transition-colors"
                       >
                         <div className="flex items-center gap-4 min-w-0">
-                          <div className={`shrink-0 px-2 py-1 rounded-lg border text-[10px] font-bold uppercase ${severityColor[d.severity]}`}>{d.severity}</div>
+                          <div
+                            className={`shrink-0 px-2 py-1 rounded-lg border text-[10px] font-bold uppercase ${severityColor[d.severity]}`}
+                          >
+                            {d.severity}
+                          </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{d.type} — {d.location}</p>
-                            <p className="text-xs text-muted-foreground">{d.time} · {d.affected} users affected</p>
+                            <p className="text-sm font-medium truncate">
+                              {d.type} — {d.location}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {d.time} · {d.affected} gigworkers affected
+                            </p>
                           </div>
                         </div>
-                        <span className={`shrink-0 text-xs font-semibold capitalize ${statusColor[d.status]}`}>{d.status}</span>
+                        <span
+                          className={`shrink-0 text-xs font-semibold capitalize ${statusColor[d.status]}`}
+                        >
+                          {d.status}
+                        </span>
                       </motion.div>
                     ))}
                   </div>
@@ -318,29 +1338,58 @@ export default function AdminDashboard() {
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border text-muted-foreground">
-                              <th className="text-left px-5 py-3 font-medium text-xs">ID</th>
-                              <th className="text-left px-5 py-3 font-medium text-xs">User</th>
-                              <th className="text-left px-5 py-3 font-medium text-xs">Amount</th>
-                              <th className="text-left px-5 py-3 font-medium text-xs">Method</th>
-                              <th className="text-left px-5 py-3 font-medium text-xs">Date</th>
-                              <th className="text-left px-5 py-3 font-medium text-xs">Status</th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                ID
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                User
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Amount
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Method
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Date
+                              </th>
+                              <th className="text-left px-5 py-3 font-medium text-xs">
+                                Status
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
                             {payouts.map((p, i) => {
                               const SIcon = statusIcon[p.status] || Clock;
                               return (
-                                <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}
-                                  className="border-b border-border/50 hover:bg-white/[0.02] transition-colors"
+                                <motion.tr
+                                  key={p.id}
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  transition={{ delay: i * 0.05 }}
+                                  className="border-b border-border/50 hover:bg-white/2 transition-colors"
                                 >
-                                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{p.id}</td>
-                                  <td className="px-5 py-3 font-medium">{p.user}</td>
-                                  <td className="px-5 py-3 tabular">₹{p.amount.toLocaleString()}</td>
-                                  <td className="px-5 py-3 text-muted-foreground">{p.method}</td>
-                                  <td className="px-5 py-3 text-muted-foreground">{p.date}</td>
+                                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">
+                                    {p.id}
+                                  </td>
+                                  <td className="px-5 py-3 font-medium">
+                                    {p.user}
+                                  </td>
+                                  <td className="px-5 py-3 tabular">
+                                    ₹{p.amount.toLocaleString()}
+                                  </td>
+                                  <td className="px-5 py-3 text-muted-foreground">
+                                    {p.method}
+                                  </td>
+                                  <td className="px-5 py-3 text-muted-foreground">
+                                    {p.date}
+                                  </td>
                                   <td className="px-5 py-3">
-                                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${statusColor[p.status]}`}>
-                                      <SIcon className="w-3 h-3" />{p.status}
+                                    <span
+                                      className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${statusColor[p.status]}`}
+                                    >
+                                      <SIcon className="w-3 h-3" />
+                                      {p.status}
                                     </span>
                                   </td>
                                 </motion.tr>
@@ -358,20 +1407,36 @@ export default function AdminDashboard() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 mb-2">
                       <AlertTriangle className="w-4 h-4 text-red-400" />
-                      <span className="text-sm font-semibold">Fraud Alerts</span>
-                      <span className="ml-2 bg-red-500/20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full">{fraudAlerts.length} active</span>
+                      <span className="text-sm font-semibold">
+                        Fraud Alerts
+                      </span>
+                      <span className="ml-2 bg-red-500/20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {fraudAlerts.length} active
+                      </span>
                     </div>
                     {fraudAlerts.map((a, i) => (
-                      <motion.div key={a.id} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}
+                      <motion.div
+                        key={a.id}
+                        initial={{ opacity: 0, x: -12 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.06 }}
                         className="glass-panel rounded-xl p-5 hover:border-red-500/20 transition-all duration-300 group"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-semibold">{a.type}</span>
-                              <span className={`text-[10px] font-bold capitalize ${statusColor[a.status]}`}>• {a.status}</span>
+                              <span className="text-sm font-semibold">
+                                {a.type}
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold capitalize ${statusColor[a.status]}`}
+                              >
+                                • {a.status}
+                              </span>
                             </div>
-                            <p className="text-xs text-muted-foreground mb-2">{a.desc}</p>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              {a.desc}
+                            </p>
                             <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                               <span className="font-mono">{a.user}</span>
                               <span>·</span>
@@ -379,14 +1444,21 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <div className="shrink-0 text-center">
-                            <div className={`text-lg font-bold tabular ${a.risk >= 90 ? "text-red-400" : a.risk >= 80 ? "text-orange-400" : "text-amber-400"}`}>{a.risk}%</div>
-                            <div className="text-[10px] text-muted-foreground">risk</div>
+                            <div
+                              className={`text-lg font-bold tabular ${a.risk >= 90 ? "text-red-400" : a.risk >= 80 ? "text-orange-400" : "text-amber-400"}`}
+                            >
+                              {a.risk}%
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              risk
+                            </div>
                           </div>
                         </div>
                         {/* Risk bar */}
                         <div className="mt-3 h-1 rounded-full bg-white/5 overflow-hidden">
                           <motion.div
-                            initial={{ width: 0 }} animate={{ width: `${a.risk}%` }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${a.risk}%` }}
                             transition={{ duration: 0.8, delay: i * 0.1 }}
                             className={`h-full rounded-full ${a.risk >= 90 ? "bg-red-500" : a.risk >= 80 ? "bg-orange-500" : "bg-amber-500"}`}
                           />
@@ -395,7 +1467,6 @@ export default function AdminDashboard() {
                     ))}
                   </div>
                 )}
-
               </motion.div>
             </AnimatePresence>
           </div>

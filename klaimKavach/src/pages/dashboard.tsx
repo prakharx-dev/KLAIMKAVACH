@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useWeather, type WeatherData } from "@/hooks/use-weather";
 import { useTraffic, type TrafficData } from "@/hooks/use-traffic";
+import { plansById, type InsurancePlan, type PlanId } from "@/lib/plans";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
@@ -66,8 +67,16 @@ const MOCK = {
     { label: "Behavior Normal", ok: true, icon: "behavior" },
   ],
   alerts: [
-    { msg: "Heavy rain detected — You are covered", type: "rain", time: "2:10 PM" },
-    { msg: "Claim auto-triggered — ₹150 credited", type: "claim", time: "2:11 PM" },
+    {
+      msg: "Heavy rain detected — You are covered",
+      type: "rain",
+      time: "2:10 PM",
+    },
+    {
+      msg: "Claim auto-triggered — ₹150 credited",
+      type: "claim",
+      time: "2:11 PM",
+    },
     { msg: "AQI high — Protection active", type: "aqi", time: "3:00 PM" },
   ],
   earningsSaved: 950,
@@ -87,7 +96,13 @@ function cn(...classes: (string | boolean | undefined)[]) {
 }
 
 // ─── Animated Counter ─────────────────────────────────────────────────────────
-function AnimatedCounter({ value, duration = 1200 }: { value: number; duration?: number }) {
+function AnimatedCounter({
+  value,
+  duration = 1200,
+}: {
+  value: number;
+  duration?: number;
+}) {
   const [display, setDisplay] = useState(0);
   const startRef = useRef(0);
   const startTimeRef = useRef<number | null>(null);
@@ -98,9 +113,14 @@ function AnimatedCounter({ value, duration = 1200 }: { value: number; duration?:
     startTimeRef.current = null;
     const animate = (timestamp: number) => {
       if (!startTimeRef.current) startTimeRef.current = timestamp;
-      const progress = Math.min((timestamp - startTimeRef.current) / duration, 1);
+      const progress = Math.min(
+        (timestamp - startTimeRef.current) / duration,
+        1,
+      );
       const eased = 1 - Math.pow(1 - progress, 4);
-      setDisplay(Math.round(startRef.current + (value - startRef.current) * eased));
+      setDisplay(
+        Math.round(startRef.current + (value - startRef.current) * eased),
+      );
       if (progress < 1) rafRef.current = requestAnimationFrame(animate);
     };
     rafRef.current = requestAnimationFrame(animate);
@@ -115,8 +135,14 @@ function PulseDot({ size = "sm" }: { size?: "sm" | "md" }) {
   const sz = size === "md" ? "h-2.5 w-2.5" : "h-1.5 w-1.5";
   return (
     <span className={cn("relative flex", sz)}>
-      <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-40 bg-emerald-500")} />
-      <span className={cn("relative inline-flex rounded-full bg-emerald-500", sz)} />
+      <span
+        className={cn(
+          "animate-ping absolute inline-flex h-full w-full rounded-full opacity-40 bg-emerald-500",
+        )}
+      />
+      <span
+        className={cn("relative inline-flex rounded-full bg-emerald-500", sz)}
+      />
     </span>
   );
 }
@@ -138,7 +164,7 @@ function DashCard({
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay }}
       className={cn(
         "relative rounded-xl border border-[#1f1f1f] bg-[#111] p-5 transition-all duration-200 hover:border-[#2a2a2a]",
-        className
+        className,
       )}
     >
       {children}
@@ -153,13 +179,23 @@ function CardLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
       <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-[#2a2a2a] bg-[#1a1a1a] text-white/40 shrink-0">
         {icon}
       </div>
-      <p className="text-xs font-semibold uppercase tracking-widest text-white/30">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-widest text-white/30">
+        {label}
+      </p>
     </div>
   );
 }
 
 // ─── 1. Active Coverage Card ───────────────────────────────────────────────────
-function ActiveCoverageCard({ weather, traffic }: { weather: WeatherData; traffic: TrafficData }) {
+function ActiveCoverageCard({
+  weather,
+  traffic,
+  currentPlan,
+}: {
+  weather: WeatherData;
+  traffic: TrafficData;
+  currentPlan: InsurancePlan;
+}) {
   const coverageIcons: Record<string, React.ReactNode> = {
     Rain: <CloudRain className="w-3 h-3" />,
     AQI: <Wind className="w-3 h-3" />,
@@ -167,50 +203,72 @@ function ActiveCoverageCard({ weather, traffic }: { weather: WeatherData; traffi
   };
 
   // Generate dynamic next-risk based on real weather and traffic
-  const nextRiskMsg = weather.rain1h > 0
-    ? `Rain detected — ${weather.rain1h}mm in last hour`
-    : traffic.congestionLevel > 50
-    ? `Heavy Traffic — ${traffic.congestionLevel}% congestion`
-    : weather.aqi > 200
-    ? `AQI at ${weather.aqi} — Air quality poor`
-    : weather.windSpeed > 40
-    ? `High winds — ${weather.windSpeed} km/h`
-    : traffic.congestionLevel > 20
-    ? `Moderate Traffic — Drive safely`
-    : `${weather.description} in ${weather.city}`;
+  const nextRiskMsg =
+    weather.rain1h > 0
+      ? `Rain detected — ${weather.rain1h}mm in last hour`
+      : traffic.congestionLevel > 50
+        ? `Heavy Traffic — ${traffic.congestionLevel}% congestion`
+        : weather.aqi > 200
+          ? `AQI at ${weather.aqi} — Air quality poor`
+          : weather.windSpeed > 40
+            ? `High winds — ${weather.windSpeed} km/h`
+            : traffic.congestionLevel > 20
+              ? `Moderate Traffic — Drive safely`
+              : `${weather.description} in ${weather.city}`;
 
   return (
-    <DashCard className="col-span-1 lg:col-span-2 xl:col-span-2 flex flex-col gap-5" delay={0.05}>
+    <DashCard
+      className="col-span-1 lg:col-span-2 xl:col-span-2 flex flex-col gap-5"
+      delay={0.05}
+    >
       <div className="flex items-start justify-between">
-        <CardLabel icon={<Shield className="w-4 h-4" />} label="Active Coverage" />
+        <CardLabel
+          icon={<Shield className="w-4 h-4" />}
+          label="Active Coverage"
+        />
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
           <PulseDot />
-          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">Protected</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">
+            Protected
+          </span>
         </div>
       </div>
 
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-[10px] text-white/20 uppercase tracking-wider font-medium mb-1">Weekly Premium</p>
+          <p className="text-[10px] text-white/20 uppercase tracking-wider font-medium mb-1">
+            Weekly Premium
+          </p>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-5xl font-bold text-foreground tabular-nums tracking-tight">₹99</span>
+            <span className="text-5xl font-bold text-foreground tabular-nums tracking-tight">
+              ₹{currentPlan.weeklyPremium}
+            </span>
             <span className="text-white/30 text-sm font-medium">/week</span>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-white/20 uppercase tracking-wider mb-1">Plan</p>
-          <span className="text-lg font-bold text-foreground">Elite</span>
+          <p className="text-[10px] text-white/20 uppercase tracking-wider mb-1">
+            Plan
+          </p>
+          <span className="text-lg font-bold text-foreground">
+            {currentPlan.name}
+          </span>
         </div>
       </div>
 
       {/* Coverage tags */}
       <div className="flex flex-wrap gap-2">
-        {MOCK.coverage.map((c) => (
+        {[
+          "Rain",
+          "AQI",
+          "Traffic",
+          `${currentPlan.claimHoursCap}h Claim Cap`,
+        ].map((c) => (
           <span
             key={c}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 text-xs font-medium"
           >
-            {coverageIcons[c]} {c}
+            {coverageIcons[c] ?? <Shield className="w-3 h-3" />} {c}
           </span>
         ))}
       </div>
@@ -229,7 +287,8 @@ function ActiveCoverageCard({ weather, traffic }: { weather: WeatherData; traffi
             {weather.isLoading ? "Fetching weather..." : nextRiskMsg}
           </p>
           <p className="text-[11px] text-white/20 mt-0.5">
-            {weather.city} · {weather.temp}°C · Updated {weather.updatedAt.toLocaleTimeString()}
+            {weather.city} · {weather.temp}°C · Updated{" "}
+            {weather.updatedAt.toLocaleTimeString()}
           </p>
         </div>
         <ChevronRight className="w-4 h-4 text-white/15 shrink-0" />
@@ -239,32 +298,43 @@ function ActiveCoverageCard({ weather, traffic }: { weather: WeatherData; traffi
 }
 
 // ─── 2. Live Risk Score Card ───────────────────────────────────────────────────
-function LiveRiskScoreCard({ weather, traffic }: { weather: WeatherData; traffic: TrafficData }) {
+function LiveRiskScoreCard({
+  weather,
+  traffic,
+}: {
+  weather: WeatherData;
+  traffic: TrafficData;
+}) {
   // Compute risk score from real weather and traffic data
   const rainRisk = Math.min(100, weather.rain1h * 10); // 10mm = 100% rain risk
   const aqiRisk = Math.min(100, (weather.aqi / 500) * 100);
   const trafficRisk = traffic.congestionLevel;
-  const score = Math.round((rainRisk * 0.35 + aqiRisk * 0.35 + trafficRisk * 0.3));
+  const score = Math.round(
+    rainRisk * 0.35 + aqiRisk * 0.35 + trafficRisk * 0.3,
+  );
 
   // Dynamic explanation based on real data
-  const explanation = weather.isLoading || traffic.isLoading
-    ? "Fetching live data..."
-    : traffic.congestionLevel > 50
-    ? `Severe traffic congestion (${traffic.congestionLevel}%) — high delay risk`
-    : weather.rain1h > 2
-    ? `Heavy rain detected (${weather.rain1h}mm/h) — high disruption risk in ${weather.city}`
-    : weather.aqi > 300
-    ? `AQI at ${weather.aqi} (${weather.aqiLabel}) — severe air quality risk`
-    : traffic.congestionLevel > 20
-    ? `Moderate traffic (${traffic.congestionLevel}%) — minor delay risk`
-    : weather.aqi > 200
-    ? `AQI at ${weather.aqi} (${weather.aqiLabel}) — coverage active for air quality`
-    : weather.rain1h > 0
-    ? `Light rain (${weather.rain1h}mm/h) — monitoring conditions in ${weather.city}`
-    : `Conditions stable in ${weather.city} — ${weather.description}, flow normal`;
+  const explanation =
+    weather.isLoading || traffic.isLoading
+      ? "Fetching live data..."
+      : traffic.congestionLevel > 50
+        ? `Severe traffic congestion (${traffic.congestionLevel}%) — high delay risk`
+        : weather.rain1h > 2
+          ? `Heavy rain detected (${weather.rain1h}mm/h) — high disruption risk in ${weather.city}`
+          : weather.aqi > 300
+            ? `AQI at ${weather.aqi} (${weather.aqiLabel}) — severe air quality risk`
+            : traffic.congestionLevel > 20
+              ? `Moderate traffic (${traffic.congestionLevel}%) — minor delay risk`
+              : weather.aqi > 200
+                ? `AQI at ${weather.aqi} (${weather.aqiLabel}) — coverage active for air quality`
+                : weather.rain1h > 0
+                  ? `Light rain (${weather.rain1h}mm/h) — monitoring conditions in ${weather.city}`
+                  : `Conditions stable in ${weather.city} — ${weather.description}, flow normal`;
 
-  const riskColor = score < 30 ? "#10b981" : score <= 60 ? "#f59e0b" : "#ef4444";
-  const riskLabel = score < 30 ? "Low Risk" : score <= 60 ? "Medium Risk" : "High Risk";
+  const riskColor =
+    score < 30 ? "#10b981" : score <= 60 ? "#f59e0b" : "#ef4444";
+  const riskLabel =
+    score < 30 ? "Low Risk" : score <= 60 ? "Medium Risk" : "High Risk";
 
   const r = 44;
   const circ = 2 * Math.PI * r;
@@ -273,16 +343,28 @@ function LiveRiskScoreCard({ weather, traffic }: { weather: WeatherData; traffic
   return (
     <DashCard className="flex flex-col gap-4" delay={0.1}>
       <div className="flex items-center justify-between">
-        <CardLabel icon={<Activity className="w-4 h-4" />} label="Live Risk Score" />
+        <CardLabel
+          icon={<Activity className="w-4 h-4" />}
+          label="Live Risk Score"
+        />
         <PulseDot />
       </div>
 
       <div className="flex items-center gap-5">
         <div className="relative w-28 h-28 shrink-0">
           <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+            <circle
+              cx="50"
+              cy="50"
+              r={r}
+              fill="none"
+              stroke="rgba(255,255,255,0.05)"
+              strokeWidth="8"
+            />
             <motion.circle
-              cx="50" cy="50" r={r}
+              cx="50"
+              cy="50"
+              r={r}
               fill="none"
               stroke={riskColor}
               strokeWidth="8"
@@ -305,15 +387,32 @@ function LiveRiskScoreCard({ weather, traffic }: { weather: WeatherData; traffic
           </p>
           <div className="space-y-2.5">
             {[
-              { label: "Rain", value: weather.rain1h > 0 ? `${weather.rain1h}mm/h` : "None", icon: <CloudRain className="w-3 h-3" /> },
-              { label: "AQI", value: weather.isLoading ? "—" : `${weather.aqi}`, icon: <Wind className="w-3 h-3" /> },
-              { label: "Traffic", value: traffic.isLoading ? "—" : `${traffic.congestionLevel}%`, icon: <Navigation className="w-3 h-3" /> },
+              {
+                label: "Rain",
+                value: weather.rain1h > 0 ? `${weather.rain1h}mm/h` : "None",
+                icon: <CloudRain className="w-3 h-3" />,
+              },
+              {
+                label: "AQI",
+                value: weather.isLoading ? "—" : `${weather.aqi}`,
+                icon: <Wind className="w-3 h-3" />,
+              },
+              {
+                label: "Traffic",
+                value: traffic.isLoading ? "—" : `${traffic.congestionLevel}%`,
+                icon: <Navigation className="w-3 h-3" />,
+              },
             ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between text-xs">
+              <div
+                key={item.label}
+                className="flex items-center justify-between text-xs"
+              >
                 <span className="flex items-center gap-1.5 text-white/30">
                   {item.icon} {item.label}
                 </span>
-                <span className="font-semibold text-white/60">{item.value}</span>
+                <span className="font-semibold text-white/60">
+                  {item.value}
+                </span>
               </div>
             ))}
           </div>
@@ -332,7 +431,13 @@ function LiveRiskScoreCard({ weather, traffic }: { weather: WeatherData; traffic
 }
 
 // ─── 3. Live Trigger Status Card ──────────────────────────────────────────────
-function LiveTriggerStatusCard({ weather, traffic }: { weather: WeatherData; traffic: TrafficData }) {
+function LiveTriggerStatusCard({
+  weather,
+  traffic,
+}: {
+  weather: WeatherData;
+  traffic: TrafficData;
+}) {
   const triggers = [
     {
       label: "Rainfall",
@@ -366,7 +471,9 @@ function LiveTriggerStatusCard({ weather, traffic }: { weather: WeatherData; tra
     <DashCard className="flex flex-col gap-4 min-h-[360px]" delay={0.15}>
       <div className="flex items-center justify-between">
         <CardLabel icon={<Zap className="w-4 h-4" />} label="Trigger Status" />
-        <span className="text-[10px] font-semibold text-white/30">{activeCount} active</span>
+        <span className="text-[10px] font-semibold text-white/30">
+          {activeCount} active
+        </span>
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -376,18 +483,31 @@ function LiveTriggerStatusCard({ weather, traffic }: { weather: WeatherData; tra
             <motion.div
               key={t.label}
               animate={{
-                backgroundColor: isActive ? "rgba(16,185,129,0.05)" : "rgba(255,255,255,0.02)",
-                borderColor: isActive ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)",
+                backgroundColor: isActive
+                  ? "rgba(16,185,129,0.05)"
+                  : "rgba(255,255,255,0.02)",
+                borderColor: isActive
+                  ? "rgba(16,185,129,0.15)"
+                  : "rgba(255,255,255,0.06)",
               }}
               transition={{ duration: 0.4 }}
               className="flex items-center justify-between rounded-lg px-4 py-3 border"
             >
               <div className="flex items-center gap-3">
-                <span className={cn("p-1.5 rounded-md transition-colors", isActive ? "bg-emerald-500/10 text-emerald-500" : "bg-white/5 text-white/20")}>
+                <span
+                  className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    isActive
+                      ? "bg-emerald-500/10 text-emerald-500"
+                      : "bg-white/5 text-white/20",
+                  )}
+                >
                   {iconMap[t.icon]}
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">{t.label}</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {t.label}
+                  </p>
                   <p className="text-xs text-white/30 font-mono">{t.value}</p>
                 </div>
               </div>
@@ -396,7 +516,7 @@ function LiveTriggerStatusCard({ weather, traffic }: { weather: WeatherData; tra
                   "text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border",
                   isActive
                     ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
-                    : "bg-white/[0.03] border-white/[0.08] text-white/20"
+                    : "bg-white/[0.03] border-white/[0.08] text-white/20",
                 )}
               >
                 {isActive ? "Active" : "Idle"}
@@ -415,7 +535,7 @@ function LiveTriggerStatusCard({ weather, traffic }: { weather: WeatherData; tra
 
 // ─── 4. Auto Claim Engine Card ─────────────────────────────────────────────────
 const CLAIM_STAGES = ["idle", "detecting", "processing", "approved"] as const;
-type ClaimStage = typeof CLAIM_STAGES[number];
+type ClaimStage = (typeof CLAIM_STAGES)[number];
 
 function AutoClaimEngineCard() {
   const [stage, setStage] = useState<ClaimStage>("approved");
@@ -431,28 +551,59 @@ function AutoClaimEngineCard() {
     return () => clearInterval(id);
   }, []);
 
-  const stageUI: Record<ClaimStage, { label: string; color: string; desc: string }> = {
-    idle: { label: "Monitoring", color: "text-white/40", desc: "Watching for trigger conditions" },
-    detecting: { label: "Trigger Detected", color: "text-white/60", desc: "Validating rain threshold breach" },
-    processing: { label: "AI Processing", color: "text-white/60", desc: "Cross-checking trust & GPS data" },
-    approved: { label: "Auto Approved", color: "text-emerald-500", desc: "Payout initiated instantly" },
+  const stageUI: Record<
+    ClaimStage,
+    { label: string; color: string; desc: string }
+  > = {
+    idle: {
+      label: "Monitoring",
+      color: "text-white/40",
+      desc: "Watching for trigger conditions",
+    },
+    detecting: {
+      label: "Trigger Detected",
+      color: "text-white/60",
+      desc: "Validating rain threshold breach",
+    },
+    processing: {
+      label: "AI Processing",
+      color: "text-white/60",
+      desc: "Cross-checking trust & GPS data",
+    },
+    approved: {
+      label: "Auto Approved",
+      color: "text-emerald-500",
+      desc: "Payout initiated instantly",
+    },
   };
 
   return (
     <DashCard className="flex flex-col gap-4 min-h-[360px]" delay={0.2}>
       <div className="flex items-center justify-between">
-        <CardLabel icon={<Cpu className="w-4 h-4" />} label="Auto Claim Engine" />
+        <CardLabel
+          icon={<Cpu className="w-4 h-4" />}
+          label="Auto Claim Engine"
+        />
         <PulseDot />
       </div>
 
       <div className="rounded-lg bg-white/[0.03] border border-[#1f1f1f] px-4 py-3">
         <div className="flex items-center gap-2 mb-1.5">
           <Radio className="w-3.5 h-3.5 text-white/20" />
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/20">Engine Status</span>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/20">
+            Engine Status
+          </span>
         </div>
         <AnimatePresence mode="wait">
-          <motion.div key={stage} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 6 }}>
-            <p className={cn("text-sm font-bold mb-0.5", stageUI[stage].color)}>{stageUI[stage].label}</p>
+          <motion.div
+            key={stage}
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 6 }}
+          >
+            <p className={cn("text-sm font-bold mb-0.5", stageUI[stage].color)}>
+              {stageUI[stage].label}
+            </p>
             <p className="text-[11px] text-white/20">{stageUI[stage].desc}</p>
           </motion.div>
         </AnimatePresence>
@@ -468,7 +619,9 @@ function AutoClaimEngineCard() {
 
       {/* Last claim grid */}
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-2">Last Claim</p>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-2">
+          Last Claim
+        </p>
         <div className="grid grid-cols-2 gap-2">
           {[
             { label: "Trigger", value: MOCK.lastClaim.trigger },
@@ -476,9 +629,16 @@ function AutoClaimEngineCard() {
             { label: "Trust Score", value: `${MOCK.lastClaim.trustScore}/100` },
             { label: "Payout", value: `₹${MOCK.lastClaim.payout}` },
           ].map((row) => (
-            <div key={row.label} className="rounded-lg bg-white/[0.03] border border-[#1f1f1f] px-3 py-2.5">
-              <p className="text-[9px] text-white/15 uppercase tracking-wider mb-1">{row.label}</p>
-              <p className="text-sm font-semibold text-foreground truncate">{row.value}</p>
+            <div
+              key={row.label}
+              className="rounded-lg bg-white/[0.03] border border-[#1f1f1f] px-3 py-2.5"
+            >
+              <p className="text-[9px] text-white/15 uppercase tracking-wider mb-1">
+                {row.label}
+              </p>
+              <p className="text-sm font-semibold text-foreground truncate">
+                {row.value}
+              </p>
             </div>
           ))}
         </div>
@@ -486,7 +646,9 @@ function AutoClaimEngineCard() {
 
       <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-4 py-2.5 mt-auto">
         <TrendingUp className="w-4 h-4 text-emerald-500 shrink-0" />
-        <p className="text-sm font-medium text-emerald-500/80">₹150 auto-credited in &lt;30s</p>
+        <p className="text-sm font-medium text-emerald-500/80">
+          ₹150 auto-credited in &lt;30s
+        </p>
         <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500/40 ml-auto shrink-0" />
       </div>
     </DashCard>
@@ -499,7 +661,9 @@ function TrustScoreCard() {
 
   useEffect(() => {
     const id = setInterval(() => {
-      setScore((s) => Math.max(72, Math.min(100, s + Math.floor(Math.random() * 5) - 2)));
+      setScore((s) =>
+        Math.max(72, Math.min(100, s + Math.floor(Math.random() * 5) - 2)),
+      );
     }, 4500);
     return () => clearInterval(id);
   }, []);
@@ -525,9 +689,18 @@ function TrustScoreCard() {
       <div className="flex items-center gap-5">
         <div className="relative w-24 h-24 shrink-0">
           <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
+            <circle
+              cx="50"
+              cy="50"
+              r="40"
+              fill="none"
+              stroke="rgba(255,255,255,0.05)"
+              strokeWidth="10"
+            />
             <motion.circle
-              cx="50" cy="50" r="40"
+              cx="50"
+              cy="50"
+              r="40"
               fill="none"
               stroke="#10b981"
               strokeWidth="10"
@@ -546,14 +719,21 @@ function TrustScoreCard() {
         </div>
         <div className="flex-1 space-y-2">
           {MOCK.trustChecks.map((c) => (
-            <div key={c.label} className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-[#1f1f1f] px-3 py-2">
+            <div
+              key={c.label}
+              className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-[#1f1f1f] px-3 py-2"
+            >
               <div className="flex items-center gap-2">
                 <span className="text-white/20">{checkIcons[c.icon]}</span>
-                <span className="text-xs text-white/50 font-medium">{c.label}</span>
+                <span className="text-xs text-white/50 font-medium">
+                  {c.label}
+                </span>
               </div>
-              {c.ok
-                ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                : <XCircle className="w-4 h-4 text-red-400" />}
+              {c.ok ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <XCircle className="w-4 h-4 text-red-400" />
+              )}
             </div>
           ))}
         </div>
@@ -561,7 +741,9 @@ function TrustScoreCard() {
 
       <div className="space-y-1.5 mt-auto">
         <div className="flex justify-between text-[10px]">
-          <span className="text-white/20 font-medium uppercase tracking-wider">Fraud Risk</span>
+          <span className="text-white/20 font-medium uppercase tracking-wider">
+            Fraud Risk
+          </span>
           <span className="text-emerald-500 font-semibold">Very Low</span>
         </div>
         <div className="h-1 bg-white/5 rounded-full overflow-hidden">
@@ -582,7 +764,7 @@ type AlertItem = { id: number; msg: string; type: string; time: string };
 
 function SmartAlertsCard() {
   const [alerts, setAlerts] = useState<AlertItem[]>(() =>
-    MOCK.alerts.map((a) => ({ ...a, id: ++alertIdCounter }))
+    MOCK.alerts.map((a) => ({ ...a, id: ++alertIdCounter })),
   );
   const [pulse, setPulse] = useState(false);
 
@@ -598,7 +780,11 @@ function SmartAlertsCard() {
   useEffect(() => {
     const id = setInterval(() => {
       const pick = extraMsgs[Math.floor(Math.random() * extraMsgs.length)];
-      const newAlert: AlertItem = { ...pick, time: "Now", id: ++alertIdCounter };
+      const newAlert: AlertItem = {
+        ...pick,
+        time: "Now",
+        id: ++alertIdCounter,
+      };
       setAlerts((prev) => [newAlert, ...prev].slice(0, 5));
       setPulse(true);
       setTimeout(() => setPulse(false), 600);
@@ -607,7 +793,8 @@ function SmartAlertsCard() {
   }, []);
 
   const alertIcon = (type: string) => {
-    if (type === "rain") return <CloudRain className="w-3.5 h-3.5 text-white/30" />;
+    if (type === "rain")
+      return <CloudRain className="w-3.5 h-3.5 text-white/30" />;
     if (type === "aqi") return <Wind className="w-3.5 h-3.5 text-white/30" />;
     return <CheckCircle2 className="w-3.5 h-3.5 text-white/30" />;
   };
@@ -615,7 +802,10 @@ function SmartAlertsCard() {
   const opacityTiers = [1, 0.8, 0.6, 0.4, 0.25];
 
   return (
-    <DashCard className="col-span-1 md:col-span-2 xl:col-span-3 flex flex-col gap-4" delay={0.3}>
+    <DashCard
+      className="col-span-1 md:col-span-2 xl:col-span-3 flex flex-col gap-4"
+      delay={0.3}
+    >
       <div className="flex items-center justify-between">
         <CardLabel icon={<Bell className="w-4 h-4" />} label="Smart Alerts" />
         <motion.span
@@ -648,8 +838,12 @@ function SmartAlertsCard() {
               <span className="w-6 h-6 rounded-md bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
                 {alertIcon(a.type)}
               </span>
-              <p className="text-sm text-white/60 font-medium leading-snug flex-1 min-w-0 truncate">{a.msg}</p>
-              <span className="text-[10px] text-white/15 shrink-0 font-mono">{a.time}</span>
+              <p className="text-sm text-white/60 font-medium leading-snug flex-1 min-w-0 truncate">
+                {a.msg}
+              </p>
+              <span className="text-[10px] text-white/15 shrink-0 font-mono">
+                {a.time}
+              </span>
             </motion.div>
           ))}
         </AnimatePresence>
@@ -671,18 +865,27 @@ function EarningsProtectedCard() {
 
   return (
     <DashCard className="flex flex-col gap-5 min-h-[280px]" delay={0.35}>
-      <CardLabel icon={<DollarSign className="w-4 h-4" />} label="Earnings Protected" />
+      <CardLabel
+        icon={<DollarSign className="w-4 h-4" />}
+        label="Earnings Protected"
+      />
 
       <div>
-        <p className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 font-medium">Saved This Month</p>
+        <p className="text-[10px] text-white/20 uppercase tracking-wider mb-1.5 font-medium">
+          Saved This Month
+        </p>
         <div className="flex items-baseline gap-1">
-          <span className="text-5xl font-bold text-foreground tabular-nums">₹<AnimatedCounter value={saved} /></span>
+          <span className="text-5xl font-bold text-foreground tabular-nums">
+            ₹<AnimatedCounter value={saved} />
+          </span>
         </div>
       </div>
 
       <div className="flex items-center gap-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-4 py-3">
         <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-        <p className="text-sm text-emerald-500/80 font-medium">{MOCK.disruptionsCovered} disruptions covered</p>
+        <p className="text-sm text-emerald-500/80 font-medium">
+          {MOCK.disruptionsCovered} disruptions covered
+        </p>
       </div>
 
       {/* Per-category breakdown */}
@@ -690,10 +893,19 @@ function EarningsProtectedCard() {
         {[
           { label: "Rain", icon: <CloudRain className="w-4 h-4" />, val: 1 },
           { label: "AQI", icon: <Wind className="w-4 h-4" />, val: 1 },
-          { label: "Traffic", icon: <Navigation className="w-4 h-4" />, val: 1 },
+          {
+            label: "Traffic",
+            icon: <Navigation className="w-4 h-4" />,
+            val: 1,
+          },
         ].map((c) => (
-          <div key={c.label} className="rounded-lg bg-white/[0.03] border border-[#1f1f1f] p-3 text-center">
-            <span className="text-white/20 flex justify-center mb-1">{c.icon}</span>
+          <div
+            key={c.label}
+            className="rounded-lg bg-white/[0.03] border border-[#1f1f1f] p-3 text-center"
+          >
+            <span className="text-white/20 flex justify-center mb-1">
+              {c.icon}
+            </span>
             <p className="text-base font-bold text-foreground">{c.val}</p>
             <p className="text-[10px] text-white/20 font-medium">{c.label}</p>
           </div>
@@ -706,15 +918,26 @@ function EarningsProtectedCard() {
 // ─── 8. Policy Rules Card ─────────────────────────────────────────────────────
 function PolicyRulesCard() {
   return (
-    <DashCard className="col-span-1 md:col-span-2 xl:col-span-2 flex flex-col gap-4" delay={0.4}>
-      <CardLabel icon={<FileText className="w-4 h-4" />} label="Policy Rules & Exclusions" />
+    <DashCard
+      className="col-span-1 md:col-span-2 xl:col-span-2 flex flex-col gap-4"
+      delay={0.4}
+    >
+      <CardLabel
+        icon={<FileText className="w-4 h-4" />}
+        label="Policy Rules & Exclusions"
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 flex-1">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-500/70 mb-2.5">Valid Conditions</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-500/70 mb-2.5">
+            Valid Conditions
+          </p>
           <div className="space-y-2">
             {MOCK.validConditions.map((v) => (
-              <div key={v} className="flex items-center gap-2.5 rounded-lg bg-emerald-500/[0.03] border border-emerald-500/10 px-3.5 py-2.5">
+              <div
+                key={v}
+                className="flex items-center gap-2.5 rounded-lg bg-emerald-500/[0.03] border border-emerald-500/10 px-3.5 py-2.5"
+              >
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                 <span className="text-sm text-white/50 font-medium">{v}</span>
               </div>
@@ -723,10 +946,15 @@ function PolicyRulesCard() {
         </div>
 
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-red-400/60 mb-2.5">Exclusions</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-red-400/60 mb-2.5">
+            Exclusions
+          </p>
           <div className="space-y-2">
             {MOCK.exclusions.map((e) => (
-              <div key={e} className="flex items-center gap-2.5 rounded-lg bg-red-500/[0.03] border border-red-500/10 px-3.5 py-2.5">
+              <div
+                key={e}
+                className="flex items-center gap-2.5 rounded-lg bg-red-500/[0.03] border border-red-500/10 px-3.5 py-2.5"
+              >
                 <XCircle className="w-3.5 h-3.5 text-red-400/60 shrink-0" />
                 <span className="text-sm text-white/30 font-medium">{e}</span>
               </div>
@@ -743,16 +971,35 @@ function SystemHealthBar() {
   return (
     <div className="flex flex-wrap items-center gap-3 px-5 py-3 rounded-xl border border-[#1f1f1f] bg-[#111] mb-6">
       <Wifi className="w-3.5 h-3.5 text-white/20 shrink-0" />
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mr-1">System</span>
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mr-1">
+        System
+      </span>
       {MOCK.systemHealth.map((s) => (
         <div key={s.label} className="flex items-center gap-1.5">
-          <span className={cn("w-1.5 h-1.5 rounded-full", s.pct >= 98 ? "bg-emerald-500" : "bg-amber-400")} />
-          <span className="text-[11px] font-medium text-white/40">{s.label}</span>
-          <span className={cn("text-[10px] font-semibold", s.pct >= 98 ? "text-emerald-500/70" : "text-amber-400/70")}>{s.pct}%</span>
+          <span
+            className={cn(
+              "w-1.5 h-1.5 rounded-full",
+              s.pct >= 98 ? "bg-emerald-500" : "bg-amber-400",
+            )}
+          />
+          <span className="text-[11px] font-medium text-white/40">
+            {s.label}
+          </span>
+          <span
+            className={cn(
+              "text-[10px] font-semibold",
+              s.pct >= 98 ? "text-emerald-500/70" : "text-amber-400/70",
+            )}
+          >
+            {s.pct}%
+          </span>
         </div>
       ))}
       <div className="ml-auto flex items-center gap-1.5 text-white/15">
-        <RefreshCw className="w-3 h-3 animate-spin" style={{ animationDuration: "3s" }} />
+        <RefreshCw
+          className="w-3 h-3 animate-spin"
+          style={{ animationDuration: "3s" }}
+        />
         <span className="text-[10px] font-mono">Syncing every 2.5s</span>
       </div>
     </div>
@@ -768,8 +1015,13 @@ export default function Dashboard() {
   const traffic = useTraffic();
 
   useEffect(() => {
-    if (!isAuthenticated) { setLocation("/register"); return; }
-    if (!selectedPlan) { setLocation("/pricing"); }
+    if (!isAuthenticated) {
+      setLocation("/register");
+      return;
+    }
+    if (!selectedPlan) {
+      setLocation("/pricing");
+    }
   }, [isAuthenticated, selectedPlan, setLocation]);
 
   useEffect(() => {
@@ -779,30 +1031,71 @@ export default function Dashboard() {
 
   if (!isAuthenticated || !selectedPlan) return null;
 
+  const planDetails = plansById[selectedPlan as PlanId];
+  const coverageLabelByPlan: Record<PlanId, string> = {
+    basic: "Low Coverage",
+    pro: "Medium Coverage",
+    elite: "High Coverage",
+  };
+
   const displayName = user?.split(" ")[0] || "Gig";
 
   // Dynamic stats from real weather and traffic data
   const rainRisk = Math.min(100, weather.rain1h * 10);
   const aqiRisk = Math.min(100, (weather.aqi / 500) * 100);
   const trafficRisk = traffic.congestionLevel;
-  const riskScore = Math.round(rainRisk * 0.35 + aqiRisk * 0.35 + trafficRisk * 0.3);
-  const riskLabel = riskScore < 30 ? "Low" : riskScore <= 60 ? "Medium" : "High";
-  const activeTrigs = [weather.rain1h > 2, weather.aqi > 300, traffic.congestionLevel > 50].filter(Boolean).length;
+  const riskScore = Math.round(
+    rainRisk * 0.35 + aqiRisk * 0.35 + trafficRisk * 0.3,
+  );
+  const riskLabel =
+    riskScore < 30 ? "Low" : riskScore <= 60 ? "Medium" : "High";
+  const activeTrigs = [
+    weather.rain1h > 2,
+    weather.aqi > 300,
+    traffic.congestionLevel > 50,
+  ].filter(Boolean).length;
 
   const statItems = [
-    { label: "Risk Level", value: riskLabel, icon: <AlertTriangle className="w-3.5 h-3.5" /> },
-    { label: "Coverage", value: "Elite Plan", icon: <Shield className="w-3.5 h-3.5" /> },
-    { label: "Triggers Active", value: `${activeTrigs} / 3`, icon: <Zap className="w-3.5 h-3.5" /> },
-    { label: "AQI", value: weather.isLoading ? "—" : `${weather.aqi}`, icon: <Wind className="w-3.5 h-3.5" /> },
-    { label: "Traffic", value: traffic.isLoading ? "—" : `${traffic.status}`, icon: <Navigation className="w-3.5 h-3.5" /> },
-    { label: "Location", value: weather.city, icon: <MapPin className="w-3.5 h-3.5" /> },
+    {
+      label: "Risk Level",
+      value: riskLabel,
+      icon: <AlertTriangle className="w-3.5 h-3.5" />,
+    },
+    {
+      label: "Coverage",
+      value: `${coverageLabelByPlan[selectedPlan as PlanId]} (${planDetails.name})`,
+      icon: <Shield className="w-3.5 h-3.5" />,
+    },
+    {
+      label: "Triggers Active",
+      value: `${activeTrigs} / 3`,
+      icon: <Zap className="w-3.5 h-3.5" />,
+    },
+    {
+      label: "AQI",
+      value: weather.isLoading ? "—" : `${weather.aqi}`,
+      icon: <Wind className="w-3.5 h-3.5" />,
+    },
+    {
+      label: "Traffic",
+      value: traffic.isLoading ? "—" : `${traffic.status}`,
+      icon: <Navigation className="w-3.5 h-3.5" />,
+    },
+    {
+      label: "Location",
+      value: weather.city,
+      icon: <MapPin className="w-3.5 h-3.5" />,
+    },
   ];
 
   return (
     <div className="-mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-10 pb-24 md:pb-10 relative">
       <Helmet>
         <title>Dashboard | KlaimKavach – AI Insurance Engine</title>
-        <meta name="description" content="Real-time AI insurance dashboard for gig workers — monitor coverage, risk, claims and trust score live." />
+        <meta
+          name="description"
+          content="Real-time AI insurance dashboard for gig workers — monitor coverage, risk, claims and trust score live."
+        />
       </Helmet>
 
       {/* ── Ambient BG ── */}
@@ -825,14 +1118,12 @@ export default function Dashboard() {
             </div>
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight leading-none">
-            Welcome back,{" "}
-            <span className="text-white/40">
-              {displayName}
-            </span>
+            Welcome back, <span className="text-white/40">{displayName}</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
             KlaimKavach AI is monitoring you{" "}
-            <span className="text-foreground font-semibold">24/7</span>. All systems operational.
+            <span className="text-foreground font-semibold">24/7</span>. All
+            systems operational.
           </p>
         </div>
 
@@ -840,8 +1131,12 @@ export default function Dashboard() {
         <div className="flex items-center gap-2.5 shrink-0 rounded-xl border border-[#1f1f1f] bg-[#111] px-5 py-3">
           <PulseDot size="md" />
           <div>
-            <p className="text-[10px] text-white/20 uppercase tracking-widest font-semibold">Live Sync</p>
-            <p className="text-base font-mono font-bold text-foreground tabular-nums">{time.toLocaleTimeString()}</p>
+            <p className="text-[10px] text-white/20 uppercase tracking-widest font-semibold">
+              Live Sync
+            </p>
+            <p className="text-base font-mono font-bold text-foreground tabular-nums">
+              {time.toLocaleTimeString()}
+            </p>
           </div>
         </div>
       </motion.header>
@@ -883,8 +1178,12 @@ export default function Dashboard() {
           >
             <span className="shrink-0 text-white/30">{s.icon}</span>
             <div className="min-w-0">
-              <p className="text-[9px] text-white/20 uppercase tracking-wider font-semibold truncate">{s.label}</p>
-              <p className="text-sm font-bold text-foreground truncate">{s.value}</p>
+              <p className="text-[9px] text-white/20 uppercase tracking-wider font-semibold truncate">
+                {s.label}
+              </p>
+              <p className="text-sm font-bold text-foreground truncate">
+                {s.value}
+              </p>
             </div>
           </motion.div>
         ))}
@@ -892,7 +1191,11 @@ export default function Dashboard() {
 
       {/* ── Main card grid ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <ActiveCoverageCard weather={weather} traffic={traffic} />
+        <ActiveCoverageCard
+          weather={weather}
+          traffic={traffic}
+          currentPlan={planDetails}
+        />
         <LiveRiskScoreCard weather={weather} traffic={traffic} />
 
         <LiveTriggerStatusCard weather={weather} traffic={traffic} />
@@ -913,7 +1216,9 @@ export default function Dashboard() {
         className="mt-8 flex items-center justify-center gap-2 text-white/15 text-xs"
       >
         <Clock className="w-3.5 h-3.5" />
-        <span>Data refreshes every 2.5s · Powered by KlaimKavach AI Engine v2.1</span>
+        <span>
+          Data refreshes every 2.5s · Powered by KlaimKavach AI Engine v2.1
+        </span>
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
       </motion.div>
     </div>

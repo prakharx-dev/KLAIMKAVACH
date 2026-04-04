@@ -16,6 +16,14 @@ export function Navbar() {
       ];
 
   const publicPages = ["/", "/features", "/pricing", "/about"];
+  const publicNavItems =
+    isAuthenticated && isAdmin
+      ? []
+      : [
+          { href: "/features", label: "Features" },
+          { href: "/pricing", label: "Pricing" },
+          { href: "/about", label: "About" },
+        ];
   const isPublicPage = publicPages.includes(location);
   const isAuthPage = location === "/register";
   const isAppPage = !isPublicPage && !isAuthPage;
@@ -38,11 +46,7 @@ export function Navbar() {
             </Link>
 
             <nav className="hidden md:flex items-center gap-6">
-              {[
-                { href: "/features", label: "Features" },
-                { href: "/pricing", label: "Pricing" },
-                { href: "/about", label: "About" },
-              ].map((item) => (
+              {publicNavItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

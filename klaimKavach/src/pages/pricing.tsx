@@ -3,7 +3,9 @@ import { Link, useLocation } from "wouter";
 import { CheckCircle2, ArrowRight, Zap } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/hooks/use-auth";
-import { plans } from "@/lib/plans";
+import { plans, type PlanId } from "@/lib/plans";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 20 },
@@ -37,15 +39,225 @@ const faqs = [
 
 export default function Pricing() {
   const [, setLocation] = useLocation();
-  const { isAuthenticated, selectPlan } = useAuth();
+  const { isAuthenticated, selectPlan, login, user } = useAuth();
+  const { toast } = useToast();
+  const [isPaying, setIsPaying] = useState<PlanId | null>(null);
 
-  const handleSelectPlan = (planId: "basic" | "pro" | "elite") => {
-    selectPlan(planId);
-    if (isAuthenticated) {
-      setLocation("/dashboard");
+  const backendBaseUrl =
+    import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "") ??
+    "http://localhost:5000";
+  const paymentApiBase = `${backendBaseUrl}/api/payment`;
+  const localFallbackApiBase = "http://127.0.0.1:5000/api/payment";
+  const razorpayKeyFromEnv = import.meta.env.VITE_RAZORPAY_KEY_ID;
+
+  const fetchPaymentApi = async (path: string, init?: RequestInit) => {
+    try {
+      return await fetch(`${paymentApiBase}${path}`, init);
+    } catch (error) {
+      if (backendBaseUrl.includes("localhost")) {
+        return fetch(`${localFallbackApiBase}${path}`, init);
+      }
+      throw error;
+    }
+  };
+
+  const getPaymentFailureMessage = (
+    response?: RazorpayPaymentFailureResponse,
+  ) => {
+    const description = response?.error?.description?.trim();
+    const reason = response?.error?.reason?.trim();
+
+    if (description) {
+      if (/international cards are not supported/i.test(description)) {
+        return {
+          title: "Payment could not be completed",
+          description:
+            "International cards are not supported for this payment. Please use UPI, net banking, or an India-issued card.",
+        };
+      }
+
+      return {
+        title: "Payment failed",
+        description,
+      };
+    }
+
+    if (reason) {
+      return {
+        title: "Payment failed",
+        description: reason,
+      };
+    }
+
+    return {
+      title: "Payment failed",
+      description: "Your transaction did not complete. Please try again.",
+    };
+  };
+
+  const handlePayment = async (
+    planId: PlanId,
+    planName: string,
+    amount: number,
+  ) => {
+    let razorpayKey = razorpayKeyFromEnv;
+
+    if (!razorpayKey) {
+      try {
+        const configResponse = await fetchPaymentApi("/config");
+        const configPayload = await configResponse.json();
+        if (configResponse.ok && configPayload?.keyId) {
+          razorpayKey = configPayload.keyId;
+        }
+      } catch {
+        // Keep fallback handling below.
+      }
+    }
+
+    if (!razorpayKey) {
+      toast({
+        title: "Payment configuration missing",
+        description:
+          "Set RAZORPAY_KEY_ID in backend .env or VITE_RAZORPAY_KEY_ID in frontend .env.",
+        variant: "destructive",
+      });
       return;
     }
-    setLocation(`/register?plan=${planId}`);
+
+    if (!window.Razorpay) {
+      toast({
+        title: "Razorpay unavailable",
+        description:
+          "Checkout SDK did not load. Refresh the page and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPaying(planId);
+
+    try {
+      const orderResponse = await fetchPaymentApi("/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+
+      const orderPayload = await orderResponse.json();
+
+      if (!orderResponse.ok || !orderPayload?.order_id) {
+        throw new Error(
+          orderPayload?.message || "Unable to create payment order.",
+        );
+      }
+
+      const options = {
+        key: razorpayKey,
+        amount: orderPayload.amount,
+        currency: orderPayload.currency,
+        order_id: orderPayload.order_id,
+        name: "KlaimKavach",
+        description: `${planName} Plan`,
+        retry: {
+          enabled: false,
+        },
+        modal: {
+          ondismiss: () => {
+            setIsPaying(null);
+          },
+        },
+        handler: async (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            const verifyResponse = await fetch(
+              `${paymentApiBase}/verify-payment`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(response),
+              },
+            );
+
+            // Retry via 127.0.0.1 when localhost resolution fails in some environments.
+            const finalVerifyResponse = verifyResponse.ok
+              ? verifyResponse
+              : await fetchPaymentApi("/verify-payment", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(response),
+                });
+
+            const verifyPayload = await finalVerifyResponse.json();
+
+            if (!finalVerifyResponse.ok || !verifyPayload?.success) {
+              throw new Error("Payment verification failed.");
+            }
+
+            selectPlan(planId);
+            if (!isAuthenticated) {
+              login(user ?? "Gig Worker", "gigworker", planId);
+            }
+
+            toast({
+              title: "Payment successful",
+              description: `${planName} plan is now active.`,
+            });
+            setLocation("/dashboard");
+          } catch {
+            toast({
+              title: "Verification failed",
+              description:
+                "Payment was captured but verification failed. Please contact support.",
+              variant: "destructive",
+            });
+          } finally {
+            setIsPaying(null);
+          }
+        },
+        prefill: {
+          name: user ?? "Gig Worker",
+        },
+        theme: {
+          color: "#111111",
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+
+      razorpay.on("payment.failed", (response) => {
+        const failureMessage = getPaymentFailureMessage(response);
+        toast({
+          title: failureMessage.title,
+          description: failureMessage.description,
+          variant: "destructive",
+        });
+        setIsPaying(null);
+      });
+
+      razorpay.open();
+    } catch (error) {
+      const isNetworkError =
+        error instanceof TypeError && /fetch/i.test(error.message);
+      toast({
+        title: "Payment could not start",
+        description: isNetworkError
+          ? `Cannot reach payment server at ${backendBaseUrl}. Start backend with npm run server.`
+          : error instanceof Error
+            ? error.message
+            : "Unexpected error while starting checkout.",
+        variant: "destructive",
+      });
+      setIsPaying(null);
+    }
+  };
+
+  const handleSelectPlan = (planId: "basic" | "pro" | "elite") => {
+    const plan = plans.find((item) => item.id === planId);
+    if (!plan) return;
+    void handlePayment(plan.id, plan.name, plan.weeklyPremium);
   };
 
   return (
@@ -140,17 +352,18 @@ export default function Pricing() {
               <motion.button
                 type="button"
                 onClick={() => handleSelectPlan(plan.id)}
+                disabled={isPaying !== null}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all inline-flex cursor-pointer items-center justify-center ${
                   plan.highlight
                     ? "bg-white text-black hover:bg-white/90"
                     : "border border-[#2a2a2a] text-white/60 hover:text-white hover:border-white/20"
-                }`}
+                } ${isPaying !== null ? "opacity-60 cursor-not-allowed" : ""}`}
               >
-                {isAuthenticated
-                  ? `Switch to ${plan.name}`
-                  : `Choose ${plan.name}`}
+                {isPaying === plan.id
+                  ? "Processing..."
+                  : `Switch to ${plan.name}`}
               </motion.button>
             </motion.div>
           ))}
