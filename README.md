@@ -181,19 +181,18 @@ Weekly plans priced at **₹49–₹99**, based on:
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
-| 💻 Frontend | React.js / Flutter | User interface for delivery partners |
+| 💻 Frontend | React.js | User interface for delivery partners |
 | 🧠 Backend | Node.js (Express.js) | API handling, system orchestration |
 | 🧠 AI Decision Engine | Rule-based intelligent scoring (Node.js) | Real-time risk scoring using environmental signals |
 | 🛡️ Anti-Fraud Intelligence | Heuristic + multi-signal verification | Trust score, anomaly detection, group fraud detection |
 | 🌧️ Weather API | OpenWeatherMap API | Detect rainfall, temperature disruptions |
-| 🌫️ AQI API | AQICN / OpenWeather Air API | Monitor air quality (AQI triggers) |
-| 🚧 Traffic API | Google Maps / Mapbox API | Detect traffic congestion & road issues |
+| 🌫️ AQI API | OpenAQ / OpenWeather Air API | Monitor air quality (AQI triggers) |
+| 🚧 Traffic API | TomTom API | Detect traffic congestion & road issues |
 | 📍 IP Geolocation | IPinfo / ip-api | Detect location mismatch (anti-spoofing) |
-| 📌 Geocoding | Google Geocoding API | Convert GPS → real-world location |
 | 📱 Device Sensors | GPS, Accelerometer | Movement & behavior validation |
-| 💸 Payments | Razorpay (Test Mode) / Stripe | Simulated instant payouts |
+| 💸 Payments | Razorpay (Test Mode) | Simulated instant payouts |
 | 🗄️ Database | MongoDB / Firebase | Store users, claims, risk & trust scores |
-| ☁️ Deployment | Vercel / Render / AWS | Hosting frontend & backend |
+| ☁️ Deployment | Vercel / Flip.io | Hosting frontend & backend |
 
 ---
 
