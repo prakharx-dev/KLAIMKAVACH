@@ -101,26 +101,40 @@ export default function Pricing() {
     amount: number,
   ) => {
     let razorpayKey = razorpayKeyFromEnv;
+    let configFetchFailed = false;
+    let configFetchStatus: number | null = null;
 
     if (!razorpayKey) {
       try {
         const configResponse = await fetchPaymentApi("/config");
+        configFetchStatus = configResponse.status;
         const configPayload = await configResponse.json();
         if (configResponse.ok && configPayload?.keyId) {
           razorpayKey = configPayload.keyId;
         }
       } catch {
-        // Keep fallback handling below.
+        configFetchFailed = true;
       }
     }
 
     if (!razorpayKey) {
-      toast({
-        title: "Payment configuration missing",
-        description:
-          "Set RAZORPAY_KEY_ID in backend .env or VITE_RAZORPAY_KEY_ID in frontend .env.",
-        variant: "destructive",
-      });
+      if (configFetchFailed) {
+        toast({
+          title: "Payment server unreachable",
+          description:
+            "Could not fetch payment config from backend. Set VITE_BACKEND_URL to your live backend URL or configure VITE_RAZORPAY_KEY_ID in frontend env.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Payment configuration missing",
+          description:
+            configFetchStatus === 404
+              ? "Backend payment config endpoint was not found. Deploy backend payment routes or set VITE_RAZORPAY_KEY_ID in frontend env."
+              : "Set RAZORPAY_KEY_ID in backend env or VITE_RAZORPAY_KEY_ID in frontend env.",
+          variant: "destructive",
+        });
+      }
       return;
     }
 
