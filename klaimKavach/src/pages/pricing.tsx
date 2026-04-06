@@ -44,15 +44,20 @@ export default function Pricing() {
   const [isPaying, setIsPaying] = useState<PlanId | null>(null);
 
   const backendBaseUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "");
+  const frontendOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
+  
+  // Prioritize configured absolute backend URL, then fallbacks.
   const apiBaseCandidates = [
     backendBaseUrl,
-    typeof window !== "undefined" ? window.location.origin : undefined,
+    // Add localhost specifically for local dev
     "http://localhost:5000",
     "http://127.0.0.1:5000",
+    frontendOrigin, // Only try the frontend origin as a last resort since it may return HTML fallbacks.
   ].filter(
     (value, index, array): value is string =>
       Boolean(value) && array.indexOf(value) === index,
   );
+  
   const razorpayKeyFromEnv = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
   const isJsonResponse = (response: Response) => {

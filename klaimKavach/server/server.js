@@ -17,7 +17,7 @@ for (const envPath of envCandidates) {
 const { connectToDatabase } = await import("./config/mongodb.js");
 const { default: app } = await import("./app.js");
 
-const port = Number(process.env.BACKEND_PORT ?? 5000);
+const port = Number(process.env.PORT || process.env.BACKEND_PORT || 5000);
 
 try {
   await connectToDatabase();

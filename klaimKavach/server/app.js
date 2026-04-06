@@ -22,19 +22,26 @@ const corsAllowlist = new Set([...defaultOrigins, ...allowedOrigins]);
 
 app.use(
   cors({
-    origin(origin, callback) {
+    origin: function (origin, callback) {
+      // Allow all origins if FRONTEND_ORIGIN is '*' or not set in production
+      if (!origin || corsAllowlist.has("*") || allowedOrigins.length === 0) {
+        return callback(null, true);
+      }
+      
       const isLocalDevOrigin =
         typeof origin === "string" &&
         /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
 
-      if (!origin || corsAllowlist.has(origin) || isLocalDevOrigin) {
-        callback(null, true);
-        return;
+      if (corsAllowlist.has(origin) || isLocalDevOrigin) {
+        return callback(null, true);
       }
+      
+      // Return a JSON error instead of throwing an exception (which causes HTML response)
       callback(new Error(`CORS blocked for origin: ${origin}`));
     },
   }),
 );
+
 app.use(bodyParser.json());
 
 app.get("/health", (_req, res) => {
@@ -44,5 +51,27 @@ app.get("/health", (_req, res) => {
 app.use("/api/payment", paymentRouter);
 app.use("/api", paymentRouter);
 app.use("/api", coreRouter);
+
+// Global Error Handler to ensure JSON responses on errors (like CORS block or others)
+app.use((err, req, res, next) => {
+  // If headers are already sent, delegate to Express default handler
+  if (res.headersSent) {
+    return next(err);
+  }
+  
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    error: process.env.NODE_ENV === "development" ? err.stack : undefined
+  });
+});
+
+// JSON 404 handler for unknown routes
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `API Route not found: ${req.url}`
+  });
+});
 
 export default app;
