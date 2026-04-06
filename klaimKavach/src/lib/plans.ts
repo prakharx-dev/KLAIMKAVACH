@@ -80,6 +80,6 @@ export const plansById: Record<PlanId, InsurancePlan> = {
   elite: plans[2],
 };
 
-export const isPlanId = (value: string | null): value is PlanId => {
+export const isPlanId = (value: string | null | undefined): value is PlanId => {
   return value === "basic" || value === "pro" || value === "elite";
 };
