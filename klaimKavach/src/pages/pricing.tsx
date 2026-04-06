@@ -43,35 +43,49 @@ export default function Pricing() {
   const { toast } = useToast();
   const [isPaying, setIsPaying] = useState<PlanId | null>(null);
 
-  const backendBaseUrl =
-    import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "") ??
-    "http://localhost:5000";
-  const paymentApiBase = `${backendBaseUrl}/api/payment`;
-  const coreApiBase = `${backendBaseUrl}/api`;
-  const localFallbackApiBase = "http://127.0.0.1:5000/api/payment";
-  const localFallbackCoreApiBase = "http://127.0.0.1:5000/api";
+  const backendBaseUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "");
+  const apiBaseCandidates = [
+    backendBaseUrl,
+    typeof window !== "undefined" ? window.location.origin : undefined,
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+  ].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
   const razorpayKeyFromEnv = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
   const fetchPaymentApi = async (path: string, init?: RequestInit) => {
-    try {
-      return await fetch(`${paymentApiBase}${path}`, init);
-    } catch (error) {
-      if (backendBaseUrl.includes("localhost")) {
-        return fetch(`${localFallbackApiBase}${path}`, init);
+    let lastError: unknown = null;
+
+    for (const baseUrl of apiBaseCandidates) {
+      try {
+        return await fetch(`${baseUrl}/api/payment${path}`, init);
+      } catch (error) {
+        lastError = error;
       }
-      throw error;
     }
+
+    if (lastError instanceof Error) {
+      throw lastError;
+    }
+
+    throw new Error("Unable to reach payment server.");
   };
 
   const fetchCoreApi = async (path: string, init?: RequestInit) => {
-    try {
-      return await fetch(`${coreApiBase}${path}`, init);
-    } catch (error) {
-      if (backendBaseUrl.includes("localhost")) {
-        return fetch(`${localFallbackCoreApiBase}${path}`, init);
+    let lastError: unknown = null;
+
+    for (const baseUrl of apiBaseCandidates) {
+      try {
+        return await fetch(`${baseUrl}/api${path}`, init);
+      } catch (error) {
+        lastError = error;
       }
-      throw error;
     }
+
+    if (lastError instanceof Error) {
+      throw lastError;
+    }
+
+    throw new Error("Unable to reach core API server.");
   };
 
   const persistSelectedPlan = async (planId: PlanId) => {
@@ -222,23 +236,11 @@ export default function Pricing() {
           razorpay_signature: string;
         }) => {
           try {
-            const verifyResponse = await fetch(
-              `${paymentApiBase}/verify-payment`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(response),
-              },
-            );
-
-            // Retry via 127.0.0.1 when localhost resolution fails in some environments.
-            const finalVerifyResponse = verifyResponse.ok
-              ? verifyResponse
-              : await fetchPaymentApi("/verify-payment", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(response),
-                });
+            const finalVerifyResponse = await fetchPaymentApi("/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(response),
+            });
 
             const verifyPayload = await finalVerifyResponse.json();
 
@@ -296,7 +298,7 @@ export default function Pricing() {
       toast({
         title: "Payment could not start",
         description: isNetworkError
-          ? `Cannot reach payment server at ${backendBaseUrl}. Start backend with npm run server.`
+          ? "Cannot reach payment server. Set VITE_BACKEND_URL to your deployed backend URL or ensure /api routes to backend."
           : error instanceof Error
             ? error.message
             : "Unexpected error while starting checkout.",
