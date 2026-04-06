@@ -52,8 +52,9 @@ export default function Pricing() {
   >(null);
 
   const backendBaseUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "");
-  const frontendOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
-  
+  const frontendOrigin =
+    typeof window !== "undefined" ? window.location.origin : undefined;
+
   // Prioritize configured absolute backend URL, then fallbacks.
   const apiBaseCandidates = [
     backendBaseUrl,
@@ -65,7 +66,7 @@ export default function Pricing() {
     (value, index, array): value is string =>
       Boolean(value) && array.indexOf(value) === index,
   );
-  
+
   const razorpayKeyFromEnv = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
   const isJsonResponse = (response: Response) => {
@@ -103,7 +104,9 @@ export default function Pricing() {
     const candidateOrder = preferredBaseUrl
       ? [
           preferredBaseUrl,
-          ...apiBaseCandidates.filter((candidate) => candidate !== preferredBaseUrl),
+          ...apiBaseCandidates.filter(
+            (candidate) => candidate !== preferredBaseUrl,
+          ),
         ]
       : apiBaseCandidates;
 
@@ -368,7 +371,33 @@ export default function Pricing() {
               "Payment verification API",
             );
 
-            if (!finalVerifyResponse.response.ok || !verifyPayload?.success) {
+            let isPaymentVerified =
+              finalVerifyResponse.response.ok && !!verifyPayload?.success;
+
+            if (!isPaymentVerified) {
+              const reconcileResponse = await fetchPaymentApi(
+                "/reconcile-payment",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                  }),
+                },
+                paymentApiBase ?? undefined,
+              );
+
+              const reconcilePayload = await parseJsonPayload<{
+                success?: boolean;
+                message?: string;
+              }>(reconcileResponse.response, "Payment reconciliation API");
+
+              isPaymentVerified =
+                reconcileResponse.response.ok && !!reconcilePayload?.success;
+            }
+
+            if (!isPaymentVerified) {
               throw new Error("Payment verification failed.");
             }
 

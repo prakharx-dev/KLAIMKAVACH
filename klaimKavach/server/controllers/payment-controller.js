@@ -26,6 +26,41 @@ function parseInrAmount(value) {
   return Math.round(amount * 100);
 }
 
+async function validatePaymentWithRazorpay({ razorpayOrderId, razorpayPaymentId }) {
+  if (!razorpayClient) {
+    return {
+      success: false,
+      statusCode: 500,
+      message:
+        "Razorpay client is not initialized. Check backend Razorpay credentials.",
+    };
+  }
+
+  const payment = await razorpayClient.payments.fetch(razorpayPaymentId);
+  const fetchedOrderId = String(payment?.order_id ?? "");
+  const expectedOrderId = String(razorpayOrderId ?? "");
+  const paymentStatus = String(payment?.status ?? "").toLowerCase();
+
+  const isValidByApi =
+    fetchedOrderId === expectedOrderId &&
+    (paymentStatus === "captured" || paymentStatus === "authorized");
+
+  if (!isValidByApi) {
+    return {
+      success: false,
+      statusCode: 400,
+      message:
+        "Payment verification failed. Order and payment details did not match Razorpay records.",
+    };
+  }
+
+  return {
+    success: true,
+    statusCode: 200,
+    verifiedBy: "api",
+  };
+}
+
 export async function createOrder(req, res) {
   try {
     if (!razorpayClient) {
@@ -106,35 +141,20 @@ export async function verifyPayment(req, res) {
       return;
     }
 
-    if (!razorpayClient) {
-      res.status(500).json({
+    const apiValidation = await validatePaymentWithRazorpay({
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+    });
+
+    if (!apiValidation.success) {
+      res.status(apiValidation.statusCode).json({
         success: false,
-        message:
-          "Razorpay client is not initialized. Check backend Razorpay credentials.",
+        message: apiValidation.message,
       });
       return;
     }
 
-    // Fallback verification with Razorpay API for cases where signature check fails in production.
-    const payment = await razorpayClient.payments.fetch(razorpay_payment_id);
-    const fetchedOrderId = String(payment?.order_id ?? "");
-    const expectedOrderId = String(razorpay_order_id ?? "");
-    const paymentStatus = String(payment?.status ?? "").toLowerCase();
-
-    const isValidByApi =
-      fetchedOrderId === expectedOrderId &&
-      (paymentStatus === "captured" || paymentStatus === "authorized");
-
-    if (!isValidByApi) {
-      res.status(400).json({
-        success: false,
-        message:
-          "Payment verification failed. Order and payment details did not match Razorpay records.",
-      });
-      return;
-    }
-
-    res.status(200).json({ success: true, verifiedBy: "api" });
+    res.status(200).json({ success: true, verifiedBy: apiValidation.verifiedBy });
   } catch (error) {
     console.error("Razorpay Verify Error:", error);
     res.status(500).json({
@@ -143,6 +163,48 @@ export async function verifyPayment(req, res) {
         error instanceof Error
           ? error.message
           : "Unexpected payment verification error.",
+    });
+  }
+}
+
+export async function reconcilePayment(req, res) {
+  try {
+    const { razorpay_order_id, razorpay_payment_id } = req.body ?? {};
+
+    if (!razorpay_order_id || !razorpay_payment_id) {
+      res.status(400).json({
+        success: false,
+        message: "Missing payment reconciliation fields (order_id/payment_id).",
+      });
+      return;
+    }
+
+    const apiValidation = await validatePaymentWithRazorpay({
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+    });
+
+    if (!apiValidation.success) {
+      res.status(apiValidation.statusCode).json({
+        success: false,
+        message: apiValidation.message,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      reconciled: true,
+      verifiedBy: apiValidation.verifiedBy,
+    });
+  } catch (error) {
+    console.error("Razorpay Reconcile Error:", error);
+    res.status(500).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unexpected payment reconciliation error.",
     });
   }
 }
