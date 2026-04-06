@@ -49,12 +49,18 @@ export default function Pricing() {
     typeof window !== "undefined" ? window.location.origin : undefined,
     "http://localhost:5000",
     "http://127.0.0.1:5000",
-  ].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
+  ].filter(
+    (value, index, array): value is string =>
+      Boolean(value) && array.indexOf(value) === index,
+  );
   const razorpayKeyFromEnv = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
   const isJsonResponse = (response: Response) => {
-    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-    return contentType.includes("application/json") || contentType.includes("+json");
+    const contentType =
+      response.headers.get("content-type")?.toLowerCase() ?? "";
+    return (
+      contentType.includes("application/json") || contentType.includes("+json")
+    );
   };
 
   const parseJsonPayload = async <T,>(response: Response, context: string) => {
@@ -67,7 +73,7 @@ export default function Pricing() {
       return JSON.parse(raw) as T;
     } catch {
       throw new Error(
-        `${context} returned a non-JSON response. Set VITE_BACKEND_URL correctly or route /api to backend.`,
+        `${context} returned a non-JSON response. Ensure VITE_BACKEND_URL points to your backend and that /api routes to backend.`,
       );
     }
   };
@@ -78,7 +84,7 @@ export default function Pricing() {
     init?: RequestInit,
   ) => {
     let lastNetworkError: unknown = null;
-    let lastNonJsonResponse: Response | null = null;
+    let sawNonJsonResponse = false;
 
     for (const baseUrl of apiBaseCandidates) {
       try {
@@ -86,14 +92,16 @@ export default function Pricing() {
         if (isJsonResponse(response)) {
           return response;
         }
-        lastNonJsonResponse = response;
+        sawNonJsonResponse = true;
       } catch (error) {
         lastNetworkError = error;
       }
     }
 
-    if (lastNonJsonResponse) {
-      return lastNonJsonResponse;
+    if (sawNonJsonResponse) {
+      throw new Error(
+        "Payment API returned a non-JSON response. Check VITE_BACKEND_URL and proxy routing for /api.",
+      );
     }
 
     if (lastNetworkError instanceof Error) {
@@ -127,10 +135,10 @@ export default function Pricing() {
       body: JSON.stringify({ email, planId }),
     });
 
-    const payload = await parseJsonPayload<{ success?: boolean; message?: string }>(
-      response,
-      "Plan selection API",
-    );
+    const payload = await parseJsonPayload<{
+      success?: boolean;
+      message?: string;
+    }>(response, "Plan selection API");
 
     if (!response.ok || !payload?.success) {
       throw new Error(payload?.message || "Failed to save selected plan.");
@@ -277,11 +285,14 @@ export default function Pricing() {
           razorpay_signature: string;
         }) => {
           try {
-            const finalVerifyResponse = await fetchPaymentApi("/verify-payment", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(response),
-            });
+            const finalVerifyResponse = await fetchPaymentApi(
+              "/verify-payment",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(response),
+              },
+            );
 
             const verifyPayload = await parseJsonPayload<{ success?: boolean }>(
               finalVerifyResponse,
