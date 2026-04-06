@@ -52,40 +52,63 @@ export default function Pricing() {
   ].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
   const razorpayKeyFromEnv = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
-  const fetchPaymentApi = async (path: string, init?: RequestInit) => {
-    let lastError: unknown = null;
+  const isJsonResponse = (response: Response) => {
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    return contentType.includes("application/json") || contentType.includes("+json");
+  };
+
+  const parseJsonPayload = async <T,>(response: Response, context: string) => {
+    const raw = await response.text();
+    if (!raw.trim()) {
+      return null as T | null;
+    }
+
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      throw new Error(
+        `${context} returned a non-JSON response. Set VITE_BACKEND_URL correctly or route /api to backend.`,
+      );
+    }
+  };
+
+  const fetchFromApiCandidates = async (
+    prefix: "/api" | "/api/payment",
+    path: string,
+    init?: RequestInit,
+  ) => {
+    let lastNetworkError: unknown = null;
+    let lastNonJsonResponse: Response | null = null;
 
     for (const baseUrl of apiBaseCandidates) {
       try {
-        return await fetch(`${baseUrl}/api/payment${path}`, init);
+        const response = await fetch(`${baseUrl}${prefix}${path}`, init);
+        if (isJsonResponse(response)) {
+          return response;
+        }
+        lastNonJsonResponse = response;
       } catch (error) {
-        lastError = error;
+        lastNetworkError = error;
       }
     }
 
-    if (lastError instanceof Error) {
-      throw lastError;
+    if (lastNonJsonResponse) {
+      return lastNonJsonResponse;
     }
 
-    throw new Error("Unable to reach payment server.");
+    if (lastNetworkError instanceof Error) {
+      throw lastNetworkError;
+    }
+
+    throw new Error("Unable to reach API server.");
+  };
+
+  const fetchPaymentApi = async (path: string, init?: RequestInit) => {
+    return fetchFromApiCandidates("/api/payment", path, init);
   };
 
   const fetchCoreApi = async (path: string, init?: RequestInit) => {
-    let lastError: unknown = null;
-
-    for (const baseUrl of apiBaseCandidates) {
-      try {
-        return await fetch(`${baseUrl}/api${path}`, init);
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    if (lastError instanceof Error) {
-      throw lastError;
-    }
-
-    throw new Error("Unable to reach core API server.");
+    return fetchFromApiCandidates("/api", path, init);
   };
 
   const persistSelectedPlan = async (planId: PlanId) => {
@@ -104,7 +127,10 @@ export default function Pricing() {
       body: JSON.stringify({ email, planId }),
     });
 
-    const payload = await response.json();
+    const payload = await parseJsonPayload<{ success?: boolean; message?: string }>(
+      response,
+      "Plan selection API",
+    );
 
     if (!response.ok || !payload?.success) {
       throw new Error(payload?.message || "Failed to save selected plan.");
@@ -158,7 +184,10 @@ export default function Pricing() {
       try {
         const configResponse = await fetchPaymentApi("/config");
         configFetchStatus = configResponse.status;
-        const configPayload = await configResponse.json();
+        const configPayload = await parseJsonPayload<{ keyId?: string }>(
+          configResponse,
+          "Payment config API",
+        );
         if (configResponse.ok && configPayload?.keyId) {
           razorpayKey = configPayload.keyId;
         }
@@ -207,12 +236,24 @@ export default function Pricing() {
         body: JSON.stringify({ amount }),
       });
 
-      const orderPayload = await orderResponse.json();
+      const orderPayload = await parseJsonPayload<{
+        order_id?: string;
+        amount?: number;
+        currency?: string;
+        message?: string;
+      }>(orderResponse, "Create order API");
 
       if (!orderResponse.ok || !orderPayload?.order_id) {
         throw new Error(
           orderPayload?.message || "Unable to create payment order.",
         );
+      }
+
+      if (
+        typeof orderPayload.amount !== "number" ||
+        typeof orderPayload.currency !== "string"
+      ) {
+        throw new Error("Payment order response is incomplete.");
       }
 
       const options = {
@@ -242,7 +283,10 @@ export default function Pricing() {
               body: JSON.stringify(response),
             });
 
-            const verifyPayload = await finalVerifyResponse.json();
+            const verifyPayload = await parseJsonPayload<{ success?: boolean }>(
+              finalVerifyResponse,
+              "Payment verification API",
+            );
 
             if (!finalVerifyResponse.ok || !verifyPayload?.success) {
               throw new Error("Payment verification failed.");
