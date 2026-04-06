@@ -28,6 +28,15 @@ function parseInrAmount(value) {
 
 export async function createOrder(req, res) {
   try {
+    if (!razorpayClient) {
+      res.status(500).json({
+        success: false,
+        message:
+          "Razorpay client is not initialized. Check backend Razorpay credentials.",
+      });
+      return;
+    }
+
     const amountInPaise = parseInrAmount(req.body?.amount);
 
     if (!amountInPaise) {
@@ -60,11 +69,11 @@ export async function createOrder(req, res) {
   }
 }
 
-export function verifyPayment(req, res) {
+export async function verifyPayment(req, res) {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } =
       req.body ?? {};
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
 
     if (!keySecret) {
       res.status(500).json({
@@ -74,32 +83,66 @@ export function verifyPayment(req, res) {
       return;
     }
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    if (!razorpay_order_id || !razorpay_payment_id) {
       res.status(400).json({
         success: false,
-        message: "Missing payment verification fields.",
+        message: "Missing payment verification fields (order_id/payment_id).",
       });
       return;
     }
 
-    const isValid = verifyRazorpaySignature({
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
-      razorpaySignature: razorpay_signature,
-      keySecret,
-    });
+    const hasSignature = typeof razorpay_signature === "string";
+    const isValidBySignature =
+      hasSignature &&
+      verifyRazorpaySignature({
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+        keySecret,
+      });
 
-    if (!isValid) {
+    if (isValidBySignature) {
+      res.status(200).json({ success: true, verifiedBy: "signature" });
+      return;
+    }
+
+    if (!razorpayClient) {
+      res.status(500).json({
+        success: false,
+        message:
+          "Razorpay client is not initialized. Check backend Razorpay credentials.",
+      });
+      return;
+    }
+
+    // Fallback verification with Razorpay API for cases where signature check fails in production.
+    const payment = await razorpayClient.payments.fetch(razorpay_payment_id);
+    const fetchedOrderId = String(payment?.order_id ?? "");
+    const expectedOrderId = String(razorpay_order_id ?? "");
+    const paymentStatus = String(payment?.status ?? "").toLowerCase();
+
+    const isValidByApi =
+      fetchedOrderId === expectedOrderId &&
+      (paymentStatus === "captured" || paymentStatus === "authorized");
+
+    if (!isValidByApi) {
       res.status(400).json({
         success: false,
         message:
-          "Payment signature verification failed. Ensure checkout key and backend Razorpay credentials belong to the same Razorpay account.",
+          "Payment verification failed. Order and payment details did not match Razorpay records.",
       });
       return;
     }
 
-    res.status(200).json({ success: true });
-  } catch {
-    res.status(500).json({ success: false });
+    res.status(200).json({ success: true, verifiedBy: "api" });
+  } catch (error) {
+    console.error("Razorpay Verify Error:", error);
+    res.status(500).json({
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unexpected payment verification error.",
+    });
   }
 }

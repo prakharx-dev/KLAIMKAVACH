@@ -1,7 +1,7 @@
 import Razorpay from "razorpay";
 
-const keyId = process.env.RAZORPAY_KEY_ID;
-const keySecret = process.env.RAZORPAY_KEY_SECRET;
+const keyId = process.env.RAZORPAY_KEY_ID?.trim();
+const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
 
 if (!keyId || !keySecret) {
   console.error("⚠️ WARNING: Missing Razorpay credentials in environment. Payments will fail.");
