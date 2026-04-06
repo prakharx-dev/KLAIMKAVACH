@@ -6,40 +6,13 @@ import coreRouter from "./routes/core-routes.js";
 
 const app = express();
 
-const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-const defaultOrigins = [
-  "http://localhost:5001",
-  "http://localhost:5173",
-  "http://127.0.0.1:5001",
-  "http://127.0.0.1:5173",
-];
-
-const corsAllowlist = new Set([...defaultOrigins, ...allowedOrigins]);
-
+// Simplify to allow all origins and credentials
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Allow all origins if FRONTEND_ORIGIN is '*' or not set in production
-      if (!origin || corsAllowlist.has("*") || allowedOrigins.length === 0) {
-        return callback(null, true);
-      }
-      
-      const isLocalDevOrigin =
-        typeof origin === "string" &&
-        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
-
-      if (corsAllowlist.has(origin) || isLocalDevOrigin) {
-        return callback(null, true);
-      }
-      
-      // Return a JSON error instead of throwing an exception (which causes HTML response)
-      callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
-  }),
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
 );
 
 app.use(bodyParser.json());
