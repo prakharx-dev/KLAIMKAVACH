@@ -56,12 +56,33 @@ export default function Register() {
   const [selectedRole, setSelectedRole] = useState<UserRole>("gigworker");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const backendBaseUrl =
-    import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "") ??
-    "http://localhost:5000";
+  const backendBaseUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "");
 
-  const fetchAuthApi = (path: string, init?: RequestInit) => {
-    return fetch(`${backendBaseUrl}/api${path}`, init);
+  const apiBaseCandidates = [
+    backendBaseUrl,
+    typeof window !== "undefined" ? window.location.origin : undefined,
+    "http://localhost:5000",
+  ].filter(
+    (value, index, array): value is string =>
+      Boolean(value) && array.indexOf(value) === index,
+  );
+
+  const fetchAuthApi = async (path: string, init?: RequestInit) => {
+    let lastError: unknown = null;
+
+    for (const baseUrl of apiBaseCandidates) {
+      try {
+        return await fetch(`${baseUrl}/api${path}`, init);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (lastError instanceof Error) {
+      throw lastError;
+    }
+
+    throw new Error("Unable to reach authentication server.");
   };
 
   const selectedPlanId = useMemo(() => {
@@ -124,7 +145,11 @@ export default function Register() {
         throw new Error(errorPayload.message || "Sign in failed.");
       }
     } catch (error) {
-      if (error instanceof Error && !/User not found/i.test(error.message)) {
+      if (
+        error instanceof Error &&
+        !/User not found/i.test(error.message) &&
+        !/fetch|network|failed to fetch|load failed/i.test(error.message)
+      ) {
         toast({
           title: "Sign in failed",
           description: error.message,
@@ -180,9 +205,12 @@ export default function Register() {
       toast({
         title: "Registration Failed",
         description:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred.",
+          error instanceof Error &&
+          /fetch|network|failed to fetch|load failed/i.test(error.message)
+            ? "Could not reach the backend. Set VITE_BACKEND_URL to your deployed backend URL or ensure /api is routed to backend."
+            : error instanceof Error
+              ? error.message
+              : "An unexpected error occurred.",
         variant: "destructive",
       });
     } finally {
