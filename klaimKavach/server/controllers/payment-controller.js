@@ -89,7 +89,16 @@ export function verifyPayment(req, res) {
       keySecret,
     });
 
-    res.status(200).json({ success: isValid });
+    if (!isValid) {
+      res.status(400).json({
+        success: false,
+        message:
+          "Payment signature verification failed. Ensure checkout key and backend Razorpay credentials belong to the same Razorpay account.",
+      });
+      return;
+    }
+
+    res.status(200).json({ success: true });
   } catch {
     res.status(500).json({ success: false });
   }

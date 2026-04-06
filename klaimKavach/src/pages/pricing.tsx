@@ -7,6 +7,11 @@ import { plans, type PlanId } from "@/lib/plans";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
+type ApiFetchResult = {
+  response: Response;
+  baseUrl: string;
+};
+
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 20 },
   whileInView: { opacity: 1, y: 0 },
@@ -42,6 +47,9 @@ export default function Pricing() {
   const { isAuthenticated, selectedPlan, selectPlan, login, user } = useAuth();
   const { toast } = useToast();
   const [isPaying, setIsPaying] = useState<PlanId | null>(null);
+  const [resolvedPaymentApiBase, setResolvedPaymentApiBase] = useState<
+    string | null
+  >(null);
 
   const backendBaseUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "");
   const frontendOrigin = typeof window !== "undefined" ? window.location.origin : undefined;
@@ -87,15 +95,23 @@ export default function Pricing() {
     prefix: "/api" | "/api/payment",
     path: string,
     init?: RequestInit,
-  ) => {
+    preferredBaseUrl?: string,
+  ): Promise<ApiFetchResult> => {
     let lastNetworkError: unknown = null;
     let sawNonJsonResponse = false;
 
-    for (const baseUrl of apiBaseCandidates) {
+    const candidateOrder = preferredBaseUrl
+      ? [
+          preferredBaseUrl,
+          ...apiBaseCandidates.filter((candidate) => candidate !== preferredBaseUrl),
+        ]
+      : apiBaseCandidates;
+
+    for (const baseUrl of candidateOrder) {
       try {
         const response = await fetch(`${baseUrl}${prefix}${path}`, init);
         if (isJsonResponse(response)) {
-          return response;
+          return { response, baseUrl };
         }
         sawNonJsonResponse = true;
       } catch (error) {
@@ -116,8 +132,12 @@ export default function Pricing() {
     throw new Error("Unable to reach API server.");
   };
 
-  const fetchPaymentApi = async (path: string, init?: RequestInit) => {
-    return fetchFromApiCandidates("/api/payment", path, init);
+  const fetchPaymentApi = async (
+    path: string,
+    init?: RequestInit,
+    preferredBaseUrl?: string,
+  ) => {
+    return fetchFromApiCandidates("/api/payment", path, init, preferredBaseUrl);
   };
 
   const fetchCoreApi = async (path: string, init?: RequestInit) => {
@@ -134,7 +154,7 @@ export default function Pricing() {
       throw new Error("Please sign in again before selecting a plan.");
     }
 
-    const response = await fetchCoreApi("/plan/select", {
+    const { response } = await fetchCoreApi("/plan/select", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, planId }),
@@ -190,17 +210,52 @@ export default function Pricing() {
     amount: number,
   ) => {
     let razorpayKey = razorpayKeyFromEnv;
+    let paymentApiBase = resolvedPaymentApiBase;
     let configFetchFailed = false;
     let configFetchStatus: number | null = null;
 
+    try {
+      const { response: configResponse, baseUrl } = await fetchPaymentApi(
+        "/config",
+        undefined,
+        paymentApiBase ?? undefined,
+      );
+      configFetchStatus = configResponse.status;
+      paymentApiBase = baseUrl;
+      if (resolvedPaymentApiBase !== baseUrl) {
+        setResolvedPaymentApiBase(baseUrl);
+      }
+
+      const configPayload = await parseJsonPayload<{ keyId?: string }>(
+        configResponse,
+        "Payment config API",
+      );
+
+      if (configResponse.ok && configPayload?.keyId) {
+        razorpayKey = configPayload.keyId;
+      }
+    } catch {
+      configFetchFailed = true;
+    }
+
     if (!razorpayKey) {
       try {
-        const configResponse = await fetchPaymentApi("/config");
+        const { response: configResponse, baseUrl } = await fetchPaymentApi(
+          "/config",
+          undefined,
+          paymentApiBase ?? undefined,
+        );
         configFetchStatus = configResponse.status;
+        paymentApiBase = baseUrl;
+        if (resolvedPaymentApiBase !== baseUrl) {
+          setResolvedPaymentApiBase(baseUrl);
+        }
+
         const configPayload = await parseJsonPayload<{ keyId?: string }>(
           configResponse,
           "Payment config API",
         );
+
         if (configResponse.ok && configPayload?.keyId) {
           razorpayKey = configPayload.keyId;
         }
@@ -243,11 +298,19 @@ export default function Pricing() {
     setIsPaying(planId);
 
     try {
-      const orderResponse = await fetchPaymentApi("/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
-      });
+      const { response: orderResponse, baseUrl } = await fetchPaymentApi(
+        "/create-order",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount }),
+        },
+        paymentApiBase ?? undefined,
+      );
+      paymentApiBase = baseUrl;
+      if (resolvedPaymentApiBase !== baseUrl) {
+        setResolvedPaymentApiBase(baseUrl);
+      }
 
       const orderPayload = await parseJsonPayload<{
         order_id?: string;
@@ -297,14 +360,15 @@ export default function Pricing() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(response),
               },
+              paymentApiBase ?? undefined,
             );
 
             const verifyPayload = await parseJsonPayload<{ success?: boolean }>(
-              finalVerifyResponse,
+              finalVerifyResponse.response,
               "Payment verification API",
             );
 
-            if (!finalVerifyResponse.ok || !verifyPayload?.success) {
+            if (!finalVerifyResponse.response.ok || !verifyPayload?.success) {
               throw new Error("Payment verification failed.");
             }
 
