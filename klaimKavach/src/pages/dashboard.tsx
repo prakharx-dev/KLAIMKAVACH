@@ -4,6 +4,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { useWeather, type WeatherData } from "@/hooks/use-weather";
 import { useTraffic, type TrafficData } from "@/hooks/use-traffic";
 import { plansById, type InsurancePlan, type PlanId } from "@/lib/plans";
+import {
+  computeAIScoring,
+  type AIScoringInput,
+  type AIScoringOutput,
+} from "@/lib/ai-scoring-engine";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
@@ -93,6 +98,72 @@ const MOCK = {
 // ─── Utility ──────────────────────────────────────────────────────────────────
 function cn(...classes: (string | boolean | undefined)[]) {
   return classes.filter(Boolean).join(" ");
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+interface LiveRiskSnapshot {
+  score: number;
+  label: "Low Risk" | "Medium Risk" | "High Risk";
+}
+
+type CityRiskProfile = "metro" | "urban";
+
+function getCityRiskProfile(city: string): CityRiskProfile {
+  const metroCities = new Set([
+    "delhi",
+    "new delhi",
+    "mumbai",
+    "bengaluru",
+    "bangalore",
+    "kolkata",
+    "chennai",
+    "hyderabad",
+    "pune",
+    "ahmedabad",
+  ]);
+
+  const normalized = city.trim().toLowerCase();
+  return metroCities.has(normalized) ? "metro" : "urban";
+}
+
+function computeLiveRiskSnapshot(
+  weather: WeatherData,
+  traffic: TrafficData,
+): LiveRiskSnapshot {
+  const cityProfile = getCityRiskProfile(weather.city);
+
+  const rainNormalizer = cityProfile === "metro" ? 10 : 8;
+  const trafficWeight = cityProfile === "metro" ? 0.4 : 0.3;
+  const rainWeight = cityProfile === "metro" ? 0.25 : 0.35;
+  const aqiWeight = cityProfile === "metro" ? 0.25 : 0.25;
+  const windWeight = cityProfile === "metro" ? 0.1 : 0.1;
+
+  const aqiRisk = clampNumber(((weather.aqi - 50) / 300) * 100, 0, 100);
+  const trafficRisk = clampNumber(traffic.congestionLevel, 0, 100);
+  const windRisk = clampNumber((weather.windSpeed / 50) * 100, 0, 100);
+
+  const normalizedRainRisk = clampNumber(
+    (weather.rain1h / rainNormalizer) * 100,
+    0,
+    100,
+  );
+
+  const score = Math.round(
+    normalizedRainRisk * rainWeight +
+      aqiRisk * aqiWeight +
+      trafficRisk * trafficWeight +
+      windRisk * windWeight,
+  );
+
+  const lowToMediumThreshold = cityProfile === "metro" ? 40 : 35;
+  const mediumToHighThreshold = cityProfile === "metro" ? 72 : 70;
+
+  if (score < lowToMediumThreshold) return { score, label: "Low Risk" };
+  if (score < mediumToHighThreshold) return { score, label: "Medium Risk" };
+  return { score, label: "High Risk" };
 }
 
 // ─── Animated Counter ─────────────────────────────────────────────────────────
@@ -301,17 +372,13 @@ function ActiveCoverageCard({
 function LiveRiskScoreCard({
   weather,
   traffic,
+  liveRisk,
 }: {
   weather: WeatherData;
   traffic: TrafficData;
+  liveRisk: LiveRiskSnapshot;
 }) {
-  // Compute risk score from real weather and traffic data
-  const rainRisk = Math.min(100, weather.rain1h * 10); // 10mm = 100% rain risk
-  const aqiRisk = Math.min(100, (weather.aqi / 500) * 100);
-  const trafficRisk = traffic.congestionLevel;
-  const score = Math.round(
-    rainRisk * 0.35 + aqiRisk * 0.35 + trafficRisk * 0.3,
-  );
+  const score = liveRisk.score;
 
   // Dynamic explanation based on real data
   const explanation =
@@ -333,8 +400,7 @@ function LiveRiskScoreCard({
 
   const riskColor =
     score < 30 ? "#10b981" : score <= 60 ? "#f59e0b" : "#ef4444";
-  const riskLabel =
-    score < 30 ? "Low Risk" : score <= 60 ? "Medium Risk" : "High Risk";
+  const riskLabel = liveRisk.label;
 
   const r = 44;
   const circ = 2 * Math.PI * r;
@@ -534,22 +600,48 @@ function LiveTriggerStatusCard({
 }
 
 // ─── 4. Auto Claim Engine Card ─────────────────────────────────────────────────
-const CLAIM_STAGES = ["idle", "detecting", "processing", "approved"] as const;
-type ClaimStage = (typeof CLAIM_STAGES)[number];
+type ClaimStage = "idle" | "detecting" | "processing" | "approved" | "flagged";
 
-function AutoClaimEngineCard() {
-  const [stage, setStage] = useState<ClaimStage>("approved");
-  const [progress, setProgress] = useState(100);
+function AutoClaimEngineCard({
+  aiScore,
+  trigger,
+}: {
+  aiScore: AIScoringOutput;
+  trigger: AIScoringInput["trigger"];
+}) {
+  const storedLastClaim =
+    typeof window !== "undefined"
+      ? localStorage.getItem("klaimkavach_last_claim")
+      : null;
 
-  useEffect(() => {
-    let i = CLAIM_STAGES.indexOf("approved");
-    const id = setInterval(() => {
-      i = (i + 1) % CLAIM_STAGES.length;
-      setStage(CLAIM_STAGES[i]);
-      setProgress(i === 0 ? 0 : i === 1 ? 33 : i === 2 ? 66 : 100);
-    }, 4000);
-    return () => clearInterval(id);
-  }, []);
+  const lastClaim = storedLastClaim
+    ? (JSON.parse(storedLastClaim) as {
+        trigger?: string;
+        time?: string;
+        trustScore?: number;
+        status?: string;
+        payout?: number;
+      })
+    : null;
+
+  const stage: ClaimStage = !lastClaim
+    ? "idle"
+    : aiScore.decision === "Approved"
+      ? "approved"
+      : aiScore.decision === "Flagged"
+        ? "flagged"
+        : aiScore.finalScore >= 60
+          ? "processing"
+          : "detecting";
+
+  const progress =
+    stage === "idle"
+      ? 10
+      : stage === "detecting"
+        ? 35
+        : stage === "processing"
+          ? 70
+          : 100;
 
   const stageUI: Record<
     ClaimStage,
@@ -574,6 +666,11 @@ function AutoClaimEngineCard() {
       label: "Auto Approved",
       color: "text-emerald-500",
       desc: "Payout initiated instantly",
+    },
+    flagged: {
+      label: "Flagged for Review",
+      color: "text-amber-500",
+      desc: "Suspicious pattern found, manual review required",
     },
   };
 
@@ -624,10 +721,19 @@ function AutoClaimEngineCard() {
         </p>
         <div className="grid grid-cols-2 gap-2">
           {[
-            { label: "Trigger", value: MOCK.lastClaim.trigger },
-            { label: "Time", value: MOCK.lastClaim.time },
-            { label: "Trust Score", value: `${MOCK.lastClaim.trustScore}/100` },
-            { label: "Payout", value: `₹${MOCK.lastClaim.payout}` },
+            { label: "Trigger", value: lastClaim?.trigger ?? trigger },
+            {
+              label: "Time",
+              value: lastClaim?.time ?? new Date().toLocaleTimeString(),
+            },
+            {
+              label: "Trust Score",
+              value: `${Math.round(lastClaim?.trustScore ?? aiScore.trustScore)}/100`,
+            },
+            {
+              label: "Payout",
+              value: `₹${Math.round(lastClaim?.payout ?? aiScore.payoutEstimate)}`,
+            },
           ].map((row) => (
             <div
               key={row.label}
@@ -647,7 +753,11 @@ function AutoClaimEngineCard() {
       <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-4 py-2.5 mt-auto">
         <TrendingUp className="w-4 h-4 text-emerald-500 shrink-0" />
         <p className="text-sm font-medium text-emerald-500/80">
-          ₹150 auto-credited in &lt;30s
+          {aiScore.decision === "Approved"
+            ? `₹${Math.round(aiScore.payoutEstimate)} auto-credited in <30s`
+            : aiScore.decision === "Pending"
+              ? "Claim queued for intelligent review"
+              : "Claim blocked pending fraud investigation"}
         </p>
         <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500/40 ml-auto shrink-0" />
       </div>
@@ -656,17 +766,8 @@ function AutoClaimEngineCard() {
 }
 
 // ─── 5. Trust Score Card ──────────────────────────────────────────────────────
-function TrustScoreCard() {
-  const [score, setScore] = useState(MOCK.trustScore);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setScore((s) =>
-        Math.max(72, Math.min(100, s + Math.floor(Math.random() * 5) - 2)),
-      );
-    }, 4500);
-    return () => clearInterval(id);
-  }, []);
+function TrustScoreCard({ aiScore }: { aiScore: AIScoringOutput }) {
+  const score = aiScore.trustScore;
 
   const circ = 2 * Math.PI * 40;
   const offset = circ * (1 - score / 100);
@@ -682,7 +783,7 @@ function TrustScoreCard() {
       <div className="flex items-center justify-between">
         <CardLabel icon={<Lock className="w-4 h-4" />} label="Trust Score" />
         <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-emerald-500/8 border border-emerald-500/15 text-emerald-500">
-          Verified
+          {aiScore.systemConfidence}
         </span>
       </div>
 
@@ -744,7 +845,9 @@ function TrustScoreCard() {
           <span className="text-white/20 font-medium uppercase tracking-wider">
             Fraud Risk
           </span>
-          <span className="text-emerald-500 font-semibold">Very Low</span>
+          <span className="text-emerald-500 font-semibold">
+            {Math.round(aiScore.fraudConfidence)}%
+          </span>
         </div>
         <div className="h-1 bg-white/5 rounded-full overflow-hidden">
           <motion.div
@@ -854,14 +957,29 @@ function SmartAlertsCard() {
 
 // ─── 7. Earnings Protected Card ───────────────────────────────────────────────
 function EarningsProtectedCard() {
-  const [saved, setSaved] = useState(MOCK.earningsSaved);
+  const pastClaims =
+    typeof window !== "undefined"
+      ? Number(localStorage.getItem("klaimkavach_past_claims") ?? "0")
+      : 0;
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      setSaved((s) => s + Math.floor(Math.random() * 8));
-    }, 6000);
-    return () => clearInterval(id);
-  }, []);
+  const savedFromStorage =
+    typeof window !== "undefined"
+      ? Number(localStorage.getItem("klaimkavach_total_saved") ?? "0")
+      : 0;
+
+  const claimBreakdown =
+    typeof window !== "undefined"
+      ? (JSON.parse(
+          localStorage.getItem("klaimkavach_claim_breakdown") ??
+            '{"rain":0,"aqi":0,"traffic":0}',
+        ) as { rain?: number; aqi?: number; traffic?: number })
+      : { rain: 0, aqi: 0, traffic: 0 };
+
+  const saved = Number.isFinite(savedFromStorage)
+    ? Math.max(0, Math.round(savedFromStorage))
+    : MOCK.earningsSaved;
+
+  const disruptionsCovered = Math.max(0, pastClaims);
 
   return (
     <DashCard className="flex flex-col gap-5 min-h-[280px]" delay={0.35}>
@@ -876,7 +994,7 @@ function EarningsProtectedCard() {
         </p>
         <div className="flex items-baseline gap-1">
           <span className="text-5xl font-bold text-foreground tabular-nums">
-            ₹<AnimatedCounter value={saved} />
+            ₹{saved.toLocaleString()}
           </span>
         </div>
       </div>
@@ -884,19 +1002,27 @@ function EarningsProtectedCard() {
       <div className="flex items-center gap-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-4 py-3">
         <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
         <p className="text-sm text-emerald-500/80 font-medium">
-          {MOCK.disruptionsCovered} disruptions covered
+          {disruptionsCovered} disruptions covered
         </p>
       </div>
 
       {/* Per-category breakdown */}
       <div className="grid grid-cols-3 gap-2 mt-auto">
         {[
-          { label: "Rain", icon: <CloudRain className="w-4 h-4" />, val: 1 },
-          { label: "AQI", icon: <Wind className="w-4 h-4" />, val: 1 },
+          {
+            label: "Rain",
+            icon: <CloudRain className="w-4 h-4" />,
+            val: claimBreakdown.rain ?? 0,
+          },
+          {
+            label: "AQI",
+            icon: <Wind className="w-4 h-4" />,
+            val: claimBreakdown.aqi ?? 0,
+          },
           {
             label: "Traffic",
             icon: <Navigation className="w-4 h-4" />,
-            val: 1,
+            val: claimBreakdown.traffic ?? 0,
           },
         ].map((c) => (
           <div
@@ -1017,19 +1143,86 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isAuthenticated) {
       setLocation("/register");
-      return;
     }
-    if (!selectedPlan) {
-      setLocation("/pricing");
-    }
-  }, [isAuthenticated, selectedPlan, setLocation]);
+  }, [isAuthenticated, setLocation]);
 
   useEffect(() => {
     const id = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  if (!isAuthenticated || !selectedPlan) return null;
+  if (!isAuthenticated) return null;
+
+  const displayName = user?.split(" ")[0] || "Gig";
+
+  if (!selectedPlan) {
+    return (
+      <div className="-mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-10 pb-24 md:pb-10 relative">
+        <Helmet>
+          <title>Dashboard | KlaimKavach</title>
+          <meta
+            name="description"
+            content="Your insurance dashboard. Choose a plan from pricing to activate coverage."
+          />
+        </Helmet>
+
+        <motion.header
+          initial={{ opacity: 0, y: -14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 border-b border-[#1f1f1f] pb-6 pt-2"
+        >
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight leading-none">
+              Welcome, <span className="text-white/40">{displayName}</span>
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              Your account is ready, but no insurance plan is active yet.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0 rounded-xl border border-[#1f1f1f] bg-[#111] px-5 py-3">
+            <PulseDot size="md" />
+            <div>
+              <p className="text-[10px] text-white/20 uppercase tracking-widest font-semibold">
+                Account Status
+              </p>
+              <p className="text-base font-semibold text-foreground">No Plan</p>
+            </div>
+          </div>
+        </motion.header>
+
+        <DashCard className="max-w-3xl mx-auto mt-8 p-8" delay={0.08}>
+          <div className="flex items-start gap-3 mb-5">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center border border-[#2a2a2a] bg-[#1a1a1a] text-white/40 shrink-0">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm uppercase tracking-widest text-white/30 font-semibold mb-1">
+                No Active Coverage
+              </p>
+              <h2 className="text-2xl font-bold text-foreground tracking-tight">
+                Pick a plan to activate your dashboard insights
+              </h2>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                You are signed in successfully. To start claim protection, risk
+                monitoring, and auto payouts, buy a plan from the Pricing tab.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setLocation("/pricing")}
+            className="inline-flex items-center gap-2 rounded-lg bg-white text-black px-5 py-3 text-sm font-semibold hover:bg-white/90 transition-colors"
+          >
+            Go to Pricing
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </DashCard>
+      </div>
+    );
+  }
 
   const planDetails = plansById[selectedPlan as PlanId];
   const coverageLabelByPlan: Record<PlanId, string> = {
@@ -1038,17 +1231,43 @@ export default function Dashboard() {
     elite: "High Coverage",
   };
 
-  const displayName = user?.split(" ")[0] || "Gig";
+  const pastClaims = Number(
+    localStorage.getItem("klaimkavach_past_claims") ?? "0",
+  );
+  const approvalRate = Number(
+    localStorage.getItem("klaimkavach_approval_rate") ?? "80",
+  );
+  const fraudFlags = Number(
+    localStorage.getItem("klaimkavach_fraud_flags") ?? "0",
+  );
+
+  const trigger: AIScoringInput["trigger"] =
+    traffic.congestionLevel > 50
+      ? "Traffic Jam"
+      : weather.rain1h > 1
+        ? "Heavy Rain"
+        : "Poor AQI";
+
+  const consistency: AIScoringInput["consistency"] =
+    approvalRate > 80 ? "High" : approvalRate >= 50 ? "Medium" : "Low";
+
+  const aiScore = computeAIScoring({
+    location: weather.city,
+    ipType: "Genuine",
+    speed: traffic.currentSpeed,
+    trigger,
+    hours: 3,
+    pastClaims,
+    approvalRate,
+    fraudFlags,
+    consistency,
+  });
+
+  const liveRisk = computeLiveRiskSnapshot(weather, traffic);
 
   // Dynamic stats from real weather and traffic data
-  const rainRisk = Math.min(100, weather.rain1h * 10);
-  const aqiRisk = Math.min(100, (weather.aqi / 500) * 100);
-  const trafficRisk = traffic.congestionLevel;
-  const riskScore = Math.round(
-    rainRisk * 0.35 + aqiRisk * 0.35 + trafficRisk * 0.3,
-  );
-  const riskLabel =
-    riskScore < 30 ? "Low" : riskScore <= 60 ? "Medium" : "High";
+  const riskScore = liveRisk.score;
+  const riskLabel = liveRisk.label;
   const activeTrigs = [
     weather.rain1h > 2,
     weather.aqi > 300,
@@ -1060,6 +1279,11 @@ export default function Dashboard() {
       label: "Risk Level",
       value: riskLabel,
       icon: <AlertTriangle className="w-3.5 h-3.5" />,
+    },
+    {
+      label: "Trust Score",
+      value: `${aiScore.trustScore}/100`,
+      icon: <Lock className="w-3.5 h-3.5" />,
     },
     {
       label: "Coverage",
@@ -1166,7 +1390,7 @@ export default function Dashboard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1 }}
-        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6"
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6"
       >
         {statItems.map((s, i) => (
           <motion.div
@@ -1196,11 +1420,15 @@ export default function Dashboard() {
           traffic={traffic}
           currentPlan={planDetails}
         />
-        <LiveRiskScoreCard weather={weather} traffic={traffic} />
+        <LiveRiskScoreCard
+          weather={weather}
+          traffic={traffic}
+          liveRisk={liveRisk}
+        />
 
         <LiveTriggerStatusCard weather={weather} traffic={traffic} />
-        <AutoClaimEngineCard />
-        <TrustScoreCard />
+        <AutoClaimEngineCard aiScore={aiScore} trigger={trigger} />
+        <TrustScoreCard aiScore={aiScore} />
 
         <SmartAlertsCard />
 

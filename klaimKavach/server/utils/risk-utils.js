@@ -1,10 +1,8 @@
-import "./_env.js";
-
-function clamp(value, min, max) {
+export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function isPrivateIp(ipAddress) {
+export function isPrivateIp(ipAddress) {
   if (!ipAddress) return true;
   if (ipAddress === "::1") return true;
 
@@ -30,7 +28,7 @@ function isPrivateIp(ipAddress) {
   return lowered.startsWith("fc") || lowered.startsWith("fd");
 }
 
-function simpleHash(input) {
+export function simpleHash(input) {
   let hash = 0;
   for (let i = 0; i < input.length; i += 1) {
     hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
@@ -38,7 +36,7 @@ function simpleHash(input) {
   return hash;
 }
 
-function isValidCoordinate(value, min, max) {
+export function isValidCoordinate(value, min, max) {
   return (
     typeof value === "number" &&
     Number.isFinite(value) &&
@@ -47,11 +45,11 @@ function isValidCoordinate(value, min, max) {
   );
 }
 
-function isLikelyInIndia(latitude, longitude) {
+export function isLikelyInIndia(latitude, longitude) {
   return latitude >= 6 && latitude <= 38 && longitude >= 68 && longitude <= 98;
 }
 
-function calculateTrustScore({ latitude, longitude, ipAddress }) {
+export function calculateTrustScore({ latitude, longitude, ipAddress }) {
   let score = 50;
   const hasLocation =
     isValidCoordinate(latitude, -90, 90) &&
@@ -101,22 +99,4 @@ function calculateTrustScore({ latitude, longitude, ipAddress }) {
     details:
       "Trust signals are low due to inconsistent location or IP data. Manual fraud screening is recommended.",
   };
-}
-
-export default function handler(req, res) {
-  if (req.method !== "POST") {
-    res.status(405).json({ error: "Method not allowed" });
-    return;
-  }
-
-  const body = req.body || {};
-  const latitude =
-    typeof body.latitude === "number" ? body.latitude : undefined;
-  const longitude =
-    typeof body.longitude === "number" ? body.longitude : undefined;
-  const ipAddress =
-    typeof body.ipAddress === "string" ? body.ipAddress.trim() : undefined;
-
-  const result = calculateTrustScore({ latitude, longitude, ipAddress });
-  res.status(200).json(result);
 }

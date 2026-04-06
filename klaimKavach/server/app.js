@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import paymentRouter from "./routes/payment-routes.js";
+import coreRouter from "./routes/core-routes.js";
 
 const app = express();
 
@@ -42,5 +43,6 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/payment", paymentRouter);
 app.use("/api", paymentRouter);
+app.use("/api", coreRouter);
 
 export default app;

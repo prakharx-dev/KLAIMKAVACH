@@ -45,58 +45,52 @@ import { Helmet } from "react-helmet-async";
 
 /* ───────── Mock Data ───────── */
 const userGrowth = [
-  { month: "Sep", users: 820 },
-  { month: "Oct", users: 1240 },
-  { month: "Nov", users: 1580 },
-  { month: "Dec", users: 2100 },
-  { month: "Jan", users: 2780 },
-  { month: "Feb", users: 3450 },
-  { month: "Mar", users: 4120 },
+  { month: "Dec", users: 148 },
+  { month: "Jan", users: 186 },
+  { month: "Feb", users: 228 },
+  { month: "Mar", users: 264 },
 ];
 
 const subsByPlan = [
-  { name: "Basic", value: 1240, color: "#3b82f6" },
-  { name: "Pro", value: 890, color: "#8b5cf6" },
-  { name: "Enterprise", value: 320, color: "#10b981" },
+  { name: "Basic", value: 96, color: "#3b82f6" },
+  { name: "Pro", value: 74, color: "#8b5cf6" },
+  { name: "Enterprise", value: 28, color: "#10b981" },
 ];
 
 const revenueData = [
-  { month: "Sep", revenue: 12400 },
-  { month: "Oct", revenue: 18600 },
-  { month: "Nov", revenue: 22100 },
-  { month: "Dec", revenue: 28500 },
-  { month: "Jan", revenue: 34200 },
-  { month: "Feb", revenue: 41800 },
-  { month: "Mar", revenue: 48600 },
+  { month: "Dec", revenue: 6400 },
+  { month: "Jan", revenue: 7600 },
+  { month: "Feb", revenue: 9100 },
+  { month: "Mar", revenue: 10400 },
 ];
 
 const disruptions = [
   {
     id: 1,
     type: "Weather Alert",
-    location: "Mumbai Region",
+    location: "Pune Region",
     severity: "high",
     status: "active",
-    time: "12 min ago",
-    affected: 142,
+    time: "9 min ago",
+    affected: 37,
   },
   {
     id: 2,
     type: "AQI Spike",
-    location: "Delhi NCR",
+    location: "Noida",
     severity: "medium",
     status: "monitoring",
-    time: "28 min ago",
-    affected: 89,
+    time: "31 min ago",
+    affected: 24,
   },
   {
     id: 3,
     type: "Traffic Surge",
-    location: "NH-48 Gurugram",
-    severity: "high",
+    location: "Outer Ring Road",
+    severity: "medium",
     status: "active",
-    time: "45 min ago",
-    affected: 198,
+    time: "52 min ago",
+    affected: 42,
   },
 ];
 
@@ -104,7 +98,7 @@ const payouts = [
   {
     id: "PAY-2847",
     user: "Arjun Mehta",
-    amount: 12500,
+    amount: 3200,
     status: "completed",
     date: "Mar 28, 2026",
     method: "UPI",
@@ -112,7 +106,7 @@ const payouts = [
   {
     id: "PAY-2846",
     user: "Priya Sharma",
-    amount: 8200,
+    amount: 2100,
     status: "processing",
     date: "Mar 27, 2026",
     method: "Bank",
@@ -120,34 +114,10 @@ const payouts = [
   {
     id: "PAY-2845",
     user: "Vikram Singh",
-    amount: 45000,
+    amount: 5400,
     status: "completed",
     date: "Mar 27, 2026",
     method: "UPI",
-  },
-  {
-    id: "PAY-2844",
-    user: "Sneha Patel",
-    amount: 3400,
-    status: "failed",
-    date: "Mar 26, 2026",
-    method: "Bank",
-  },
-  {
-    id: "PAY-2843",
-    user: "Rahul Kumar",
-    amount: 15800,
-    status: "completed",
-    date: "Mar 26, 2026",
-    method: "UPI",
-  },
-  {
-    id: "PAY-2842",
-    user: "Ananya Desai",
-    amount: 22000,
-    status: "processing",
-    date: "Mar 25, 2026",
-    method: "Bank",
   },
 ];
 
@@ -156,8 +126,8 @@ const fraudAlerts = [
     id: 1,
     user: "user_x892",
     type: "Duplicate Claim",
-    risk: 92,
-    desc: "Same disruption claimed 3x from different accounts",
+    risk: 81,
+    desc: "Repeated claim from same device in short interval",
     time: "5 min ago",
     status: "unreviewed",
   },
@@ -165,8 +135,8 @@ const fraudAlerts = [
     id: 2,
     user: "user_k421",
     type: "Velocity Abuse",
-    risk: 87,
-    desc: "14 claims in 48 hours — abnormal pattern",
+    risk: 76,
+    desc: "6 claims in 24 hours — above baseline",
     time: "18 min ago",
     status: "unreviewed",
   },
@@ -174,27 +144,9 @@ const fraudAlerts = [
     id: 3,
     user: "user_m133",
     type: "Identity Mismatch",
-    risk: 78,
+    risk: 69,
     desc: "KYC data doesn't match booking details",
     time: "1h ago",
-    status: "investigating",
-  },
-  {
-    id: 4,
-    user: "user_p567",
-    type: "GPS Spoofing",
-    risk: 95,
-    desc: "Location data inconsistent with claimed disruption",
-    time: "2h ago",
-    status: "flagged",
-  },
-  {
-    id: 5,
-    user: "user_r901",
-    type: "Synthetic ID",
-    risk: 88,
-    desc: "Account matches synthetic identity patterns",
-    time: "4h ago",
     status: "investigating",
   },
 ];
@@ -206,7 +158,7 @@ const userDirectory = [
     city: "Mumbai",
     plan: "Pro",
     status: "active",
-    claims: 12,
+    claims: 4,
     joinDate: "Jan 14, 2026",
   },
   {
@@ -215,7 +167,7 @@ const userDirectory = [
     city: "Delhi",
     plan: "Basic",
     status: "active",
-    claims: 7,
+    claims: 3,
     joinDate: "Dec 21, 2025",
   },
   {
@@ -224,59 +176,35 @@ const userDirectory = [
     city: "Bengaluru",
     plan: "Enterprise",
     status: "monitoring",
-    claims: 18,
+    claims: 6,
     joinDate: "Nov 02, 2025",
-  },
-  {
-    id: "USR-0997",
-    name: "Sneha Patel",
-    city: "Ahmedabad",
-    plan: "Pro",
-    status: "inactive",
-    claims: 3,
-    joinDate: "Sep 28, 2025",
-  },
-  {
-    id: "USR-0982",
-    name: "Rahul Kumar",
-    city: "Lucknow",
-    plan: "Basic",
-    status: "active",
-    claims: 9,
-    joinDate: "Aug 17, 2025",
   },
 ];
 
 const monthlyClaims = [
-  { month: "Sep", approved: 82, rejected: 11 },
-  { month: "Oct", approved: 97, rejected: 14 },
-  { month: "Nov", approved: 112, rejected: 16 },
-  { month: "Dec", approved: 138, rejected: 21 },
-  { month: "Jan", approved: 151, rejected: 25 },
-  { month: "Feb", approved: 174, rejected: 29 },
-  { month: "Mar", approved: 193, rejected: 27 },
+  { month: "Dec", approved: 22, rejected: 4 },
+  { month: "Jan", approved: 26, rejected: 5 },
+  { month: "Feb", approved: 31, rejected: 6 },
+  { month: "Mar", approved: 35, rejected: 5 },
 ];
 
 const disruptionImpact = [
-  { type: "Weather", affected: 142, incomeLoss: 24 },
-  { type: "AQI", affected: 89, incomeLoss: 16 },
-  { type: "Traffic", affected: 198, incomeLoss: 29 },
+  { type: "Weather", affected: 37, incomeLoss: 11 },
+  { type: "AQI", affected: 24, incomeLoss: 7 },
+  { type: "Traffic", affected: 42, incomeLoss: 13 },
 ];
 
 const subscriptionTrend = [
-  { month: "Sep", active: 1680, churned: 66 },
-  { month: "Oct", active: 1825, churned: 71 },
-  { month: "Nov", active: 1970, churned: 74 },
-  { month: "Dec", active: 2140, churned: 79 },
-  { month: "Jan", active: 2285, churned: 83 },
-  { month: "Feb", active: 2368, churned: 86 },
-  { month: "Mar", active: 2450, churned: 81 },
+  { month: "Dec", active: 142, churned: 6 },
+  { month: "Jan", active: 156, churned: 7 },
+  { month: "Feb", active: 173, churned: 7 },
+  { month: "Mar", active: 198, churned: 6 },
 ];
 
 const planPerformance = [
-  { plan: "Basic", subscribers: 1240, mrr: 136400, renewals: "88%" },
-  { plan: "Pro", subscribers: 890, mrr: 195800, renewals: "93%" },
-  { plan: "Enterprise", subscribers: 320, mrr: 176000, renewals: "95%" },
+  { plan: "Basic", subscribers: 96, mrr: 4704, renewals: "86%" },
+  { plan: "Pro", subscribers: 74, mrr: 5106, renewals: "90%" },
+  { plan: "Enterprise", subscribers: 28, mrr: 2772, renewals: "94%" },
 ];
 
 const adminNotifications = [
@@ -290,7 +218,7 @@ const adminNotifications = [
   {
     id: "N-2",
     title: "Weather disruption spike",
-    detail: "142 gigworkers impacted in Mumbai",
+    detail: "37 gigworkers impacted in Pune",
     time: "10 min ago",
     section: "disruptions",
   },
@@ -304,7 +232,7 @@ const adminNotifications = [
   {
     id: "N-4",
     title: "Subscription upgrade surge",
-    detail: "38 upgrades from Basic to Pro today",
+    detail: "6 upgrades from Basic to Pro today",
     time: "1h ago",
     section: "subs",
   },
@@ -579,16 +507,16 @@ export default function AdminDashboard() {
                       <StatCard
                         icon={Users}
                         label="Total Users"
-                        value="4,120"
-                        change="+12.5%"
+                        value="264"
+                        change="+7.3%"
                         changeType="up"
                         accent="bg-blue-500"
                       />
                       <StatCard
                         icon={CreditCard}
                         label="Active Subscriptions"
-                        value="2,450"
-                        change="+8.2%"
+                        value="198"
+                        change="+5.1%"
                         changeType="up"
                         accent="bg-violet-500"
                       />
@@ -603,8 +531,8 @@ export default function AdminDashboard() {
                       <StatCard
                         icon={DollarSign}
                         label="Total Payouts"
-                        value="₹4.86L"
-                        change="+18.4%"
+                        value="₹1.07L"
+                        change="+9.8%"
                         changeType="up"
                         accent="bg-emerald-500"
                       />
@@ -618,7 +546,7 @@ export default function AdminDashboard() {
                             Revenue Overview
                           </h2>
                           <span className="text-xs text-muted-foreground">
-                            Last 7 months
+                            Last 4 months
                           </span>
                         </div>
                         <ResponsiveContainer width="100%" height={220}>
@@ -730,7 +658,7 @@ export default function AdminDashboard() {
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-semibold">User Growth</h2>
                         <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
-                          <TrendingUp className="w-3 h-3" /> +402% YoY
+                          <TrendingUp className="w-3 h-3" /> +28% QoQ
                         </span>
                       </div>
                       <ResponsiveContainer width="100%" height={200}>
@@ -776,32 +704,32 @@ export default function AdminDashboard() {
                       <StatCard
                         icon={CreditCard}
                         label="Active Subscriptions"
-                        value="2,450"
-                        change="+8.2%"
+                        value="198"
+                        change="+5.1%"
                         changeType="up"
                         accent="bg-violet-500"
                       />
                       <StatCard
                         icon={DollarSign}
                         label="Monthly Recurring Revenue"
-                        value="₹5.08L"
-                        change="+10.6%"
+                        value="₹12.6K"
+                        change="+6.4%"
                         changeType="up"
                         accent="bg-emerald-500"
                       />
                       <StatCard
                         icon={TrendingDown}
                         label="Monthly Churn"
-                        value="3.3%"
-                        change="-0.7%"
+                        value="3.0%"
+                        change="-0.3%"
                         changeType="down"
                         accent="bg-amber-500"
                       />
                       <StatCard
                         icon={TrendingUp}
                         label="Upgrade Rate"
-                        value="14.9%"
-                        change="+2.2%"
+                        value="8.4%"
+                        change="+1.1%"
                         changeType="up"
                         accent="bg-blue-500"
                       />
@@ -991,32 +919,32 @@ export default function AdminDashboard() {
                       <StatCard
                         icon={Users}
                         label="Registered Gigworkers"
-                        value="4,120"
-                        change="+12.5%"
+                        value="264"
+                        change="+7.3%"
                         changeType="up"
                         accent="bg-blue-500"
                       />
                       <StatCard
                         icon={Shield}
                         label="KYC Verified"
-                        value="3,860"
-                        change="+6.8%"
+                        value="241"
+                        change="+4.2%"
                         changeType="up"
                         accent="bg-emerald-500"
                       />
                       <StatCard
                         icon={Activity}
                         label="Active This Week"
-                        value="2,945"
-                        change="+4.1%"
+                        value="173"
+                        change="+3.8%"
                         changeType="up"
                         accent="bg-amber-500"
                       />
                       <StatCard
                         icon={AlertTriangle}
                         label="Accounts Monitoring"
-                        value="74"
-                        change="-9.2%"
+                        value="11"
+                        change="-2.6%"
                         changeType="down"
                         accent="bg-red-500"
                       />

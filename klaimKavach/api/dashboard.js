@@ -1,3 +1,5 @@
+import "./_env.js";
+
 function buildRealtimeDashboard(userName) {
   const now = Date.now();
   const cycle = Math.sin(now / 20000);

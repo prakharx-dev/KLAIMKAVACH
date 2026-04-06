@@ -3,7 +3,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { useRegisterUser } from "@workspace/api-client-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
@@ -35,6 +34,14 @@ const registerSchema = z.object({
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
+type SignInApiResponse = {
+  success?: boolean;
+  message?: string;
+  userName?: string;
+  role?: UserRole;
+  planId?: string | null;
+};
+
 const features = [
   { icon: Zap, text: "Instant claim approvals in under 60 seconds" },
   { icon: Shield, text: "AI-powered risk coverage tailored to your routes" },
@@ -45,9 +52,17 @@ const features = [
 export default function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { mutate: register, isPending } = useRegisterUser();
   const { login, selectedPlan } = useAuth();
   const [selectedRole, setSelectedRole] = useState<UserRole>("gigworker");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const backendBaseUrl =
+    import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "") ??
+    "http://localhost:5000";
+
+  const fetchAuthApi = (path: string, init?: RequestInit) => {
+    return fetch(`${backendBaseUrl}/api${path}`, init);
+  };
 
   const selectedPlanId = useMemo(() => {
     if (typeof window === "undefined") return selectedPlan;
@@ -70,35 +85,109 @@ export default function Register() {
     resolver: zodResolver(registerSchema),
   });
 
-  const onSubmit = (data: RegisterFormValues) => {
-    const payload = {
-      ...data,
-      vehicle: data.vehicle ?? "",
-      city: data.city ?? "",
-    };
-    register(
-      { data: payload },
-      {
-        onSuccess: () => {
-          const finalPlanId = selectedPlanId ?? "pro"; // Default to pro if none selected
-          login(data.name, selectedRole, finalPlanId as PlanId);
-          toast({
-            title: selectedRole === "admin" ? "Welcome, Admin" : "Welcome to KlaimKavach",
-            description: selectedRole === "admin"
-              ? "You're now logged in as an administrator."
-              : `Your ${plansById[finalPlanId as PlanId].name} plan is now active.`,
-          });
-          setLocation(selectedRole === "admin" ? "/admin" : "/dashboard");
-        },
-        onError: (error: any) => {
-          toast({
-            title: "Registration Failed",
-            description: error.message || "An unexpected error occurred.",
-            variant: "destructive",
-          });
-        },
-      },
-    );
+  const onSubmit = async (data: RegisterFormValues) => {
+    setIsSubmitting(true);
+    const email = data.email.trim().toLowerCase();
+
+    try {
+      const signInResponse = await fetchAuthApi("/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (signInResponse.ok) {
+        const payload = (await signInResponse.json()) as SignInApiResponse;
+        const roleFromDb =
+          payload.role === "admin" || payload.role === "gigworker"
+            ? payload.role
+            : "gigworker";
+        const planFromDb = isPlanId(payload.planId)
+          ? payload.planId
+          : undefined;
+
+        localStorage.setItem("klaimkavach_email", email);
+        login(payload.userName ?? data.name, roleFromDb, planFromDb);
+
+        toast({
+          title: "Welcome back",
+          description: "Signed in with your existing account.",
+        });
+
+        setLocation(roleFromDb === "admin" ? "/admin" : "/dashboard");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (signInResponse.status !== 404) {
+        const errorPayload = (await signInResponse.json()) as SignInApiResponse;
+        throw new Error(errorPayload.message || "Sign in failed.");
+      }
+    } catch (error) {
+      if (error instanceof Error && !/User not found/i.test(error.message)) {
+        toast({
+          title: "Sign in failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    try {
+      const registerResponse = await fetchAuthApi("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          email,
+          role: selectedRole,
+          vehicle: data.vehicle ?? "",
+          city: data.city ?? "",
+        }),
+      });
+
+      const response = (await registerResponse.json()) as SignInApiResponse;
+
+      if (!registerResponse.ok || response.success === false) {
+        throw new Error(response.message || "Registration failed.");
+      }
+
+      const roleFromDb =
+        response.role === "admin" || response.role === "gigworker"
+          ? response.role
+          : selectedRole;
+      const planFromDb = isPlanId(response.planId)
+        ? response.planId
+        : undefined;
+
+      localStorage.setItem("klaimkavach_email", email);
+      login(response.userName ?? data.name, roleFromDb, planFromDb);
+
+      toast({
+        title:
+          roleFromDb === "admin" ? "Welcome, Admin" : "Welcome to KlaimKavach",
+        description:
+          roleFromDb === "admin"
+            ? "You're now logged in as an administrator."
+            : planFromDb
+              ? `Your ${plansById[planFromDb].name} plan is now active.`
+              : "Account created successfully. Choose a plan from Pricing to activate coverage.",
+      });
+      setLocation(roleFromDb === "admin" ? "/admin" : "/dashboard");
+    } catch (error) {
+      toast({
+        title: "Registration Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -239,10 +328,18 @@ export default function Register() {
                     : "border-[#222] bg-[#111] hover:border-[#333]"
                 }`}
               >
-                <Bike className={`w-5 h-5 shrink-0 ${selectedRole === "gigworker" ? "text-emerald-400" : "text-muted-foreground"}`} />
+                <Bike
+                  className={`w-5 h-5 shrink-0 ${selectedRole === "gigworker" ? "text-emerald-400" : "text-muted-foreground"}`}
+                />
                 <div>
-                  <p className={`text-sm font-semibold ${selectedRole === "gigworker" ? "text-foreground" : "text-muted-foreground"}`}>Gig Worker</p>
-                  <p className="text-[10px] text-muted-foreground">Driver / Rider</p>
+                  <p
+                    className={`text-sm font-semibold ${selectedRole === "gigworker" ? "text-foreground" : "text-muted-foreground"}`}
+                  >
+                    Gig Worker
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Driver / Rider
+                  </p>
                 </div>
               </button>
               <button
@@ -254,10 +351,18 @@ export default function Register() {
                     : "border-[#222] bg-[#111] hover:border-[#333]"
                 }`}
               >
-                <ShieldCheck className={`w-5 h-5 shrink-0 ${selectedRole === "admin" ? "text-violet-400" : "text-muted-foreground"}`} />
+                <ShieldCheck
+                  className={`w-5 h-5 shrink-0 ${selectedRole === "admin" ? "text-violet-400" : "text-muted-foreground"}`}
+                />
                 <div>
-                  <p className={`text-sm font-semibold ${selectedRole === "admin" ? "text-foreground" : "text-muted-foreground"}`}>Admin</p>
-                  <p className="text-[10px] text-muted-foreground">Manager / Ops</p>
+                  <p
+                    className={`text-sm font-semibold ${selectedRole === "admin" ? "text-foreground" : "text-muted-foreground"}`}
+                  >
+                    Admin
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Manager / Ops
+                  </p>
                 </div>
               </button>
             </div>
@@ -380,13 +485,13 @@ export default function Register() {
 
             <Button
               type="submit"
-              disabled={isPending}
+              disabled={isSubmitting}
               className="w-full h-11 mt-2 font-medium rounded-lg flex items-center justify-center gap-2 bg-white text-black hover:bg-white/90 transition-all"
             >
-              {isPending ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating account...
+                  Processing...
                 </>
               ) : (
                 <>

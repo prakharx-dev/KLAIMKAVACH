@@ -56,7 +56,19 @@ function GigworkerRoute({
   return <Component />;
 }
 
-function NonAdminRoute({
+function GuestOnlyRoute({
+  component: Component,
+}: {
+  component: React.ComponentType;
+}) {
+  const { isAuthenticated, isAdmin } = useAuth();
+  if (isAuthenticated) {
+    return <Redirect to={isAdmin ? "/admin" : "/dashboard"} />;
+  }
+  return <Component />;
+}
+
+function AdminBlockedRoute({
   component: Component,
 }: {
   component: React.ComponentType;
@@ -94,16 +106,16 @@ function RouteHandler() {
           <Switch location={location} key={location}>
             <Route path="/" component={Home} />
             <Route path="/features">
-              <NonAdminRoute component={Features} />
+              <AdminBlockedRoute component={Features} />
             </Route>
             <Route path="/pricing">
-              <NonAdminRoute component={Pricing} />
+              <AdminBlockedRoute component={Pricing} />
             </Route>
             <Route path="/about">
-              <NonAdminRoute component={About} />
+              <AdminBlockedRoute component={About} />
             </Route>
             <Route path="/register">
-              <NonAdminRoute component={Register} />
+              <GuestOnlyRoute component={Register} />
             </Route>
             <Route path="/dashboard">
               <GigworkerRoute component={Dashboard} />

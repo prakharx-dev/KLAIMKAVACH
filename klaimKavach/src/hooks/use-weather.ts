@@ -36,10 +36,49 @@ function getAQILabel(aqi: number): string {
   return "Severe";
 }
 
+function parseRainPerHour(weather: any): number {
+  const rainOneHour = weather?.rain?.["1h"];
+  if (typeof rainOneHour === "number" && Number.isFinite(rainOneHour)) {
+    return Math.max(0, rainOneHour);
+  }
+
+  const rainThreeHour = weather?.rain?.["3h"];
+  if (typeof rainThreeHour === "number" && Number.isFinite(rainThreeHour)) {
+    return Math.max(0, rainThreeHour / 3);
+  }
+
+  const weatherCode = weather?.weather?.[0]?.id;
+  if (
+    typeof weatherCode === "number" &&
+    weatherCode >= 200 &&
+    weatherCode < 700
+  ) {
+    // Fallback when OpenWeather returns rain condition without volume payload.
+    return 0.2;
+  }
+
+  const weatherMain = String(weather?.weather?.[0]?.main ?? "").toLowerCase();
+  if (
+    weatherMain.includes("rain") ||
+    weatherMain.includes("drizzle") ||
+    weatherMain.includes("thunderstorm")
+  ) {
+    return 0.2;
+  }
+
+  return 0;
+}
+
 // Fallback: get approximate location from IP (no key needed)
-async function getLocationFromIP(): Promise<{ lat: number; lon: number; city: string } | null> {
+async function getLocationFromIP(): Promise<{
+  lat: number;
+  lon: number;
+  city: string;
+} | null> {
   try {
-    const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(3000) });
+    const res = await fetch("https://ipapi.co/json/", {
+      signal: AbortSignal.timeout(3000),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     return {
@@ -76,78 +115,82 @@ export function useWeather() {
   const coordsRef = useRef({ lat: DEFAULT_LAT, lon: DEFAULT_LON });
   const retryCountRef = useRef(0);
 
-  const fetchWeather = useCallback(async (lat: number, lon: number, cityHint?: string) => {
-    try {
-      const [weatherRes, aqiRes] = await Promise.all([
-        fetch(
-          `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
-        ),
-        fetch(
-          `https://api.waqi.info/feed/geo:${lat};${lon}/?token=${AQICN_API_KEY}`
-        ),
-      ]);
+  const fetchWeather = useCallback(
+    async (lat: number, lon: number, cityHint?: string) => {
+      try {
+        const [weatherRes, aqiRes] = await Promise.all([
+          fetch(
+            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`,
+          ),
+          fetch(
+            `https://api.waqi.info/feed/geo:${lat};${lon}/?token=${AQICN_API_KEY}`,
+          ),
+        ]);
 
-      if (weatherRes.status === 401) {
-        // API key not yet activated — show error with city from IP
+        if (weatherRes.status === 401) {
+          // API key not yet activated — show error with city from IP
+          setData((prev) => ({
+            ...prev,
+            city: cityHint || prev.city || "—",
+            lat,
+            lon,
+            isLoading: false,
+            error:
+              "API key activating — weather data will appear within 1-2 hours",
+          }));
+          return;
+        }
+
+        if (!weatherRes.ok) throw new Error(`Weather: ${weatherRes.status}`);
+        if (!aqiRes.ok) throw new Error(`AQI: ${aqiRes.status}`);
+
+        const weather = await weatherRes.json();
+        const aqiData = await aqiRes.json();
+
+        let aqi = 0;
+        let pm25 = 0;
+        let pm10 = 0;
+
+        if (aqiData.status === "ok") {
+          const val = aqiData.data.aqi;
+          aqi = typeof val === "number" ? val : parseInt(val, 10) || 0;
+          pm25 = aqiData.data.iaqi?.pm25?.v ?? 0;
+          pm10 = aqiData.data.iaqi?.pm10?.v ?? 0;
+        }
+        const label = getAQILabel(aqi);
+
+        retryCountRef.current = 0; // Reset on success
+
+        setData({
+          city: weather.name || cityHint || "Unknown",
+          temp: Math.round(weather.main?.temp ?? 0),
+          feelsLike: Math.round(weather.main?.feels_like ?? 0),
+          humidity: weather.main?.humidity ?? 0,
+          windSpeed: Math.round((weather.wind?.speed ?? 0) * 3.6),
+          description: weather.weather?.[0]?.description ?? "",
+          icon: weather.weather?.[0]?.icon ?? "01d",
+          rain1h: parseRainPerHour(weather),
+          aqi,
+          aqiLabel: label,
+          pm25: Math.round(pm25),
+          pm10: Math.round(pm10),
+          lat,
+          lon,
+          updatedAt: new Date(),
+          isLoading: false,
+          error: null,
+        });
+      } catch (err) {
         setData((prev) => ({
           ...prev,
           city: cityHint || prev.city || "—",
-          lat,
-          lon,
           isLoading: false,
-          error: "API key activating — weather data will appear within 1-2 hours",
+          error: err instanceof Error ? err.message : "Failed to fetch weather",
         }));
-        return;
       }
-
-      if (!weatherRes.ok) throw new Error(`Weather: ${weatherRes.status}`);
-      if (!aqiRes.ok) throw new Error(`AQI: ${aqiRes.status}`);
-
-      const weather = await weatherRes.json();
-      const aqiData = await aqiRes.json();
-
-      let aqi = 0;
-      let pm25 = 0;
-      let pm10 = 0;
-
-      if (aqiData.status === "ok") {
-        const val = aqiData.data.aqi;
-        aqi = typeof val === "number" ? val : parseInt(val, 10) || 0;
-        pm25 = aqiData.data.iaqi?.pm25?.v ?? 0;
-        pm10 = aqiData.data.iaqi?.pm10?.v ?? 0;
-      }
-      const label = getAQILabel(aqi);
-
-      retryCountRef.current = 0; // Reset on success
-
-      setData({
-        city: weather.name || cityHint || "Unknown",
-        temp: Math.round(weather.main?.temp ?? 0),
-        feelsLike: Math.round(weather.main?.feels_like ?? 0),
-        humidity: weather.main?.humidity ?? 0,
-        windSpeed: Math.round((weather.wind?.speed ?? 0) * 3.6),
-        description: weather.weather?.[0]?.description ?? "",
-        icon: weather.weather?.[0]?.icon ?? "01d",
-        rain1h: weather.rain?.["1h"] ?? 0,
-        aqi,
-        aqiLabel: label,
-        pm25: Math.round(pm25),
-        pm10: Math.round(pm10),
-        lat,
-        lon,
-        updatedAt: new Date(),
-        isLoading: false,
-        error: null,
-      });
-    } catch (err) {
-      setData((prev) => ({
-        ...prev,
-        city: cityHint || prev.city || "—",
-        isLoading: false,
-        error: err instanceof Error ? err.message : "Failed to fetch weather",
-      }));
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -174,8 +217,10 @@ export function useWeather() {
             coordsRef.current = { lat: latitude, lon: longitude };
             fetchWeather(latitude, longitude);
           },
-          () => { /* Already have IP-based data, do nothing */ },
-          { timeout: 8000, maximumAge: 300_000 }
+          () => {
+            /* Already have IP-based data, do nothing */
+          },
+          { timeout: 8000, maximumAge: 300_000 },
         );
       }
     }

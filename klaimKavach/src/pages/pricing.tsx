@@ -39,7 +39,7 @@ const faqs = [
 
 export default function Pricing() {
   const [, setLocation] = useLocation();
-  const { isAuthenticated, selectPlan, login, user } = useAuth();
+  const { isAuthenticated, selectedPlan, selectPlan, login, user } = useAuth();
   const { toast } = useToast();
   const [isPaying, setIsPaying] = useState<PlanId | null>(null);
 
@@ -47,7 +47,9 @@ export default function Pricing() {
     import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "") ??
     "http://localhost:5000";
   const paymentApiBase = `${backendBaseUrl}/api/payment`;
+  const coreApiBase = `${backendBaseUrl}/api`;
   const localFallbackApiBase = "http://127.0.0.1:5000/api/payment";
+  const localFallbackCoreApiBase = "http://127.0.0.1:5000/api";
   const razorpayKeyFromEnv = import.meta.env.VITE_RAZORPAY_KEY_ID;
 
   const fetchPaymentApi = async (path: string, init?: RequestInit) => {
@@ -58,6 +60,40 @@ export default function Pricing() {
         return fetch(`${localFallbackApiBase}${path}`, init);
       }
       throw error;
+    }
+  };
+
+  const fetchCoreApi = async (path: string, init?: RequestInit) => {
+    try {
+      return await fetch(`${coreApiBase}${path}`, init);
+    } catch (error) {
+      if (backendBaseUrl.includes("localhost")) {
+        return fetch(`${localFallbackCoreApiBase}${path}`, init);
+      }
+      throw error;
+    }
+  };
+
+  const persistSelectedPlan = async (planId: PlanId) => {
+    const email = localStorage
+      .getItem("klaimkavach_email")
+      ?.trim()
+      .toLowerCase();
+
+    if (!email) {
+      throw new Error("Please sign in again before selecting a plan.");
+    }
+
+    const response = await fetchCoreApi("/plan/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, planId }),
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok || !payload?.success) {
+      throw new Error(payload?.message || "Failed to save selected plan.");
     }
   };
 
@@ -210,6 +246,8 @@ export default function Pricing() {
               throw new Error("Payment verification failed.");
             }
 
+            await persistSelectedPlan(planId);
+
             selectPlan(planId);
             if (!isAuthenticated) {
               login(user ?? "Gig Worker", "gigworker", planId);
@@ -269,6 +307,14 @@ export default function Pricing() {
   };
 
   const handleSelectPlan = (planId: "basic" | "pro" | "elite") => {
+    if (isAuthenticated && selectedPlan === planId) {
+      toast({
+        title: "Plan already active",
+        description: "You are already subscribed to this plan.",
+      });
+      return;
+    }
+
     const plan = plans.find((item) => item.id === planId);
     if (!plan) return;
     void handlePayment(plan.id, plan.name, plan.weeklyPremium);
@@ -308,6 +354,18 @@ export default function Pricing() {
             No annual lock-ins. No hidden fees. Pay week to week and cancel
             anytime. Your first week is always free.
           </motion.p>
+
+          {isAuthenticated && selectedPlan && (
+            <motion.div
+              {...fadeUp(0.16)}
+              className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-4 py-2"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-300">
+                Current Plan: {plans.find((p) => p.id === selectedPlan)?.name}
+              </span>
+            </motion.div>
+          )}
         </div>
       </section>
 
@@ -324,6 +382,14 @@ export default function Pricing() {
                   : "border-[#1f1f1f] bg-[#111] hover:border-[#2a2a2a]"
               }`}
             >
+              {selectedPlan === plan.id && isAuthenticated && (
+                <div className="absolute top-3 right-3">
+                  <span className="px-2.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+                    Active
+                  </span>
+                </div>
+              )}
+
               {plan.badge && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black text-[10px] font-bold uppercase tracking-widest">
@@ -366,18 +432,25 @@ export default function Pricing() {
               <motion.button
                 type="button"
                 onClick={() => handleSelectPlan(plan.id)}
-                disabled={isPaying !== null}
+                disabled={
+                  isPaying !== null ||
+                  (isAuthenticated && selectedPlan === plan.id)
+                }
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all inline-flex cursor-pointer items-center justify-center ${
                   plan.highlight
                     ? "bg-white text-black hover:bg-white/90"
                     : "border border-[#2a2a2a] text-white/60 hover:text-white hover:border-white/20"
-                } ${isPaying !== null ? "opacity-60 cursor-not-allowed" : ""}`}
+                } ${isPaying !== null || (isAuthenticated && selectedPlan === plan.id) ? "opacity-60 cursor-not-allowed" : ""}`}
               >
                 {isPaying === plan.id
                   ? "Processing..."
-                  : `Switch to ${plan.name}`}
+                  : isAuthenticated && selectedPlan === plan.id
+                    ? "Current Plan"
+                    : isAuthenticated
+                      ? `Upgrade to ${plan.name}`
+                      : `Switch to ${plan.name}`}
               </motion.button>
             </motion.div>
           ))}

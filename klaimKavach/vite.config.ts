@@ -152,7 +152,11 @@ function getRealtimeDashboardPayload(userName: string) {
 }
 
 const mockApiPlugin = (): Plugin => {
-  let activeUserName = "Gig Worker"; // In-memory state
+  let activeUserName = "Gig Worker";
+  const usersByEmail = new Map<
+    string,
+    { name: string; role: "admin" | "gigworker"; planId: null }
+  >();
 
   return {
     name: "mock-api",
@@ -167,10 +171,24 @@ const mockApiPlugin = (): Plugin => {
               body += chunk.toString();
             });
             req.on("end", () => {
+              let role: "admin" | "gigworker" = "gigworker";
               try {
                 const data = JSON.parse(body);
+                const email =
+                  typeof data.email === "string"
+                    ? data.email.trim().toLowerCase()
+                    : "";
                 if (data.name) {
                   activeUserName = data.name;
+                }
+                role = data.role === "admin" ? "admin" : "gigworker";
+
+                if (email) {
+                  usersByEmail.set(email, {
+                    name: data.name || "Gig Worker",
+                    role,
+                    planId: null,
+                  });
                 }
               } catch (e) {
                 // Ignore parse errors
@@ -180,8 +198,59 @@ const mockApiPlugin = (): Plugin => {
                   success: true,
                   userId: "u_123",
                   message: "Registered successfully",
+                  userName: activeUserName,
+                  role,
+                  planId: null,
                 }),
               );
+            });
+            return;
+          }
+
+          if (req.url.includes("/signin") && req.method === "POST") {
+            let body = "";
+            req.on("data", (chunk: Buffer) => {
+              body += chunk.toString();
+            });
+            req.on("end", () => {
+              try {
+                const data = JSON.parse(body);
+                const email =
+                  typeof data.email === "string"
+                    ? data.email.trim().toLowerCase()
+                    : "";
+                const user = email ? usersByEmail.get(email) : undefined;
+
+                if (!user) {
+                  res.statusCode = 404;
+                  res.end(
+                    JSON.stringify({
+                      success: false,
+                      message: "User not found.",
+                    }),
+                  );
+                  return;
+                }
+
+                activeUserName = user.name;
+                res.end(
+                  JSON.stringify({
+                    success: true,
+                    message: "Signed in successfully",
+                    userName: user.name,
+                    role: user.role,
+                    planId: user.planId,
+                  }),
+                );
+              } catch {
+                res.statusCode = 400;
+                res.end(
+                  JSON.stringify({
+                    success: false,
+                    message: "Invalid payload.",
+                  }),
+                );
+              }
             });
             return;
           }
