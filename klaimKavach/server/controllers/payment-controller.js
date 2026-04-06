@@ -51,9 +51,10 @@ export async function createOrder(req, res) {
       currency: order.currency,
     });
   } catch (error) {
+    console.error("Razorpay Order Error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to create Razorpay order.",
+      message: `Failed to create Razorpay order. ${error instanceof Error ? error.message : "Unknown error"}`,
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
