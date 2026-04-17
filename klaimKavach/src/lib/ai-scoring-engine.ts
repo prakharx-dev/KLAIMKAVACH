@@ -1,3 +1,25 @@
+/**
+ * ─── AI Scoring Engine v3.0 ─────────────────────────────────────────────────────
+ *
+ * Hybrid scoring pipeline:
+ * 1. **ML Model (primary)** — Neural network trained on fraud patterns
+ * 2. **Rule Engine (fallback)** — Deterministic scoring when ML is loading
+ *
+ * Output includes:
+ * - ML and rule-based scores
+ * - Final blended decision
+ * - Explainability: per-feature contributions from the neural network
+ * - Model metadata (type, accuracy, epochs)
+ */
+
+import {
+  predict,
+  normalizeFeatures,
+  getModelStatus,
+  type MLPrediction,
+  type FeatureContribution,
+} from "./ml-fraud-model";
+
 export type IpType = "Genuine" | "Slight mismatch" | "Suspicious";
 export type TriggerType = "Traffic Jam" | "Heavy Rain" | "Poor AQI";
 export type ConsistencyLevel = "Low" | "Medium" | "High";
@@ -12,10 +34,16 @@ export interface AIScoringInput {
   approvalRate: number;
   fraudFlags: number;
   consistency: ConsistencyLevel;
+  // New: enriched context for ML model
+  rainIntensity?: number;
+  aqiLevel?: number;
+  trafficCongestion?: number;
+  timeSinceLastClaim?: number;
 }
 
 export type ClaimDecision = "Approved" | "Pending" | "Flagged";
 export type SystemConfidence = "High" | "Medium" | "Low";
+export type ModelType = "ml" | "rule-fallback" | "hybrid";
 
 export interface AIScoringOutput {
   riskScore: number;
@@ -26,6 +54,13 @@ export interface AIScoringOutput {
   systemConfidence: SystemConfidence;
   payoutEstimate: number;
   reasons: string[];
+  // New: ML-powered fields
+  modelType: ModelType;
+  mlPrediction: MLPrediction | null;
+  featureContributions: FeatureContribution[];
+  modelAccuracy: number;
+  modelEpochs: number;
+  modelReady: boolean;
 }
 
 interface HardOverrideResult {
@@ -98,7 +133,12 @@ function detectHardOverride(input: AIScoringInput): HardOverrideResult {
   return { active, gapKm };
 }
 
-function computeRiskScore(input: AIScoringInput, reasons: string[]): number {
+// ─── Rule-Based Scoring (Fallback) ──────────────────────────────────────────────
+
+function computeRuleRiskScore(
+  input: AIScoringInput,
+  reasons: string[],
+): number {
   let riskScore = 100;
 
   if (input.ipType === "Slight mismatch") {
@@ -186,7 +226,10 @@ function computeRiskScore(input: AIScoringInput, reasons: string[]): number {
   return clamp(Math.round(riskScore), 0, 100);
 }
 
-function computeTrustScore(input: AIScoringInput, reasons: string[]): number {
+function computeRuleTrustScore(
+  input: AIScoringInput,
+  reasons: string[],
+): number {
   let trustScore = 50;
 
   if (input.approvalRate > 80) {
@@ -280,12 +323,46 @@ function computeTrustScore(input: AIScoringInput, reasons: string[]): number {
   return clamp(Math.round(trustScore), 0, 100);
 }
 
+// ─── ML-Powered Scoring ─────────────────────────────────────────────────────────
+
+function runMLInference(input: AIScoringInput): MLPrediction | null {
+  const ipScore =
+    input.ipType === "Genuine"
+      ? 0.9
+      : input.ipType === "Slight mismatch"
+        ? 0.5
+        : 0.15;
+
+  const locationScore = input.location ? 0.85 : 0.3;
+
+  const features = normalizeFeatures({
+    rainIntensity: input.rainIntensity ?? (input.trigger === "Heavy Rain" ? 15 : 0),
+    aqiLevel: input.aqiLevel ?? (input.trigger === "Poor AQI" ? 350 : 50),
+    trafficCongestion:
+      input.trafficCongestion ?? (input.trigger === "Traffic Jam" ? 70 : 20),
+    speed: input.speed,
+    pastClaims: input.pastClaims,
+    approvalRate: input.approvalRate,
+    fraudFlags: input.fraudFlags,
+    consistency: input.consistency,
+    locationScore,
+    ipScore,
+    hoursClaimed: input.hours,
+    timeSinceLastClaim: input.timeSinceLastClaim ?? 48,
+  });
+
+  return predict(features);
+}
+
+// ─── Decision Logic ─────────────────────────────────────────────────────────────
+
 function deriveDecision(
   input: AIScoringInput,
   riskScore: number,
   trustScore: number,
   finalScore: number,
   hardOverride: HardOverrideResult,
+  mlPrediction: MLPrediction | null,
   reasons: string[],
 ): ClaimDecision {
   if (hardOverride.active) {
@@ -293,6 +370,22 @@ function deriveDecision(
       `Hard Override: IP/GPS location mismatch detected: ${hardOverride.gapKm}km gap (claim auto-flagged)`,
     );
     return "Flagged";
+  }
+
+  // ML model can override if very confident
+  if (mlPrediction && mlPrediction.confidence > 0.8) {
+    if (mlPrediction.fraudProbability > 0.85) {
+      reasons.push(
+        `ML Model: High fraud probability (${(mlPrediction.fraudProbability * 100).toFixed(1)}%) with ${(mlPrediction.confidence * 100).toFixed(0)}% confidence → Flagged`,
+      );
+      return "Flagged";
+    }
+    if (mlPrediction.fraudProbability < 0.15 && trustScore >= 60) {
+      reasons.push(
+        `ML Model: Low fraud probability (${(mlPrediction.fraudProbability * 100).toFixed(1)}%) with ${(mlPrediction.confidence * 100).toFixed(0)}% confidence → Auto Approved`,
+      );
+      return "Approved";
+    }
   }
 
   const majorFraudSignalDetected =
@@ -334,7 +427,18 @@ function deriveDecision(
   return "Pending";
 }
 
-function deriveSystemConfidence(finalScore: number): SystemConfidence {
+function deriveSystemConfidence(
+  finalScore: number,
+  mlPrediction: MLPrediction | null,
+): SystemConfidence {
+  // Boost confidence when ML model agrees with rule engine
+  if (mlPrediction && mlPrediction.confidence > 0.7) {
+    const mlSaysFraud = mlPrediction.fraudProbability > 0.5;
+    const ruleSaysFraud = finalScore < 50;
+    const modelsAgree = mlSaysFraud === ruleSaysFraud;
+    if (modelsAgree) return "High";
+  }
+
   if (finalScore > 75) return "High";
   if (finalScore >= 50) return "Medium";
   return "Low";
@@ -355,6 +459,8 @@ function derivePayoutEstimate(
   return 0;
 }
 
+// ─── Main Export ─────────────────────────────────────────────────────────────────
+
 export function computeAIScoring(input: AIScoringInput): AIScoringOutput {
   const sanitizedInput: AIScoringInput = {
     ...input,
@@ -367,12 +473,52 @@ export function computeAIScoring(input: AIScoringInput): AIScoringOutput {
 
   const reasons: string[] = [];
   const hardOverride = detectHardOverride(sanitizedInput);
+  const modelStatus = getModelStatus();
 
-  const riskScore = computeRiskScore(sanitizedInput, reasons);
-  const trustScore = computeTrustScore(sanitizedInput, reasons);
+  // 1. Rule-based scoring (always runs — serves as fallback & baseline)
+  const ruleRiskScore = computeRuleRiskScore(sanitizedInput, reasons);
+  const ruleTrustScore = computeRuleTrustScore(sanitizedInput, reasons);
+
+  // 2. ML inference (runs if model is ready)
+  const mlPrediction = runMLInference(sanitizedInput);
+
+  // 3. Blend scores
+  let riskScore: number;
+  let trustScore: number;
+  let modelType: ModelType;
+
+  if (mlPrediction) {
+    // Hybrid: 60% ML + 40% rule-based for risk, trust stays rule-based
+    const mlRiskScore = Math.round((1 - mlPrediction.fraudProbability) * 100);
+    riskScore = Math.round(0.6 * mlRiskScore + 0.4 * ruleRiskScore);
+    trustScore = ruleTrustScore;
+    modelType = "hybrid";
+
+    reasons.push(
+      `Neural Network: fraud_prob=${(mlPrediction.fraudProbability * 100).toFixed(1)}%, confidence=${(mlPrediction.confidence * 100).toFixed(0)}% (model accuracy: ${(mlPrediction.modelAccuracy * 100).toFixed(1)}%)`,
+    );
+
+    // Top 3 contributing features
+    const topFeatures = mlPrediction.featureContributions.slice(0, 3);
+    if (topFeatures.length > 0) {
+      const featureStr = topFeatures
+        .map(
+          (f) =>
+            `${f.featureName} (${f.impact > 0 ? "↑ fraud" : "↓ fraud"}: ${Math.abs(f.impact).toFixed(3)})`,
+        )
+        .join(", ");
+      reasons.push(`Key ML signals: ${featureStr}`);
+    }
+  } else {
+    riskScore = ruleRiskScore;
+    trustScore = ruleTrustScore;
+    modelType = "rule-fallback";
+    reasons.push("ML model loading — using rule engine fallback");
+  }
+
   const finalScore = round(0.6 * riskScore + 0.4 * trustScore, 2);
   reasons.push(
-    `Final Score = (Risk ${riskScore} x 0.6) + (Trust ${trustScore} x 0.4) = ${finalScore}`,
+    `Final Score = (Risk ${riskScore} × 0.6) + (Trust ${trustScore} × 0.4) = ${finalScore}`,
   );
   reasons.push(
     "Decision policy: Auto Approve >75, Pending L2 Review 50-75, Flagged/Blocked <50",
@@ -384,11 +530,15 @@ export function computeAIScoring(input: AIScoringInput): AIScoringOutput {
     trustScore,
     finalScore,
     hardOverride,
+    mlPrediction,
     reasons,
   );
 
-  const fraudConfidence = round(clamp(100 - finalScore, 0, 100), 2);
-  const systemConfidence = deriveSystemConfidence(finalScore);
+  const fraudConfidence = mlPrediction
+    ? round(mlPrediction.fraudProbability * 100, 2)
+    : round(clamp(100 - finalScore, 0, 100), 2);
+
+  const systemConfidence = deriveSystemConfidence(finalScore, mlPrediction);
   const payoutEstimate = derivePayoutEstimate(decision, finalScore);
 
   return {
@@ -400,6 +550,12 @@ export function computeAIScoring(input: AIScoringInput): AIScoringOutput {
     systemConfidence,
     payoutEstimate,
     reasons,
+    modelType,
+    mlPrediction,
+    featureContributions: mlPrediction?.featureContributions ?? [],
+    modelAccuracy: mlPrediction?.modelAccuracy ?? 0,
+    modelEpochs: mlPrediction?.modelEpochs ?? 0,
+    modelReady: modelStatus.ready,
   };
 }
 

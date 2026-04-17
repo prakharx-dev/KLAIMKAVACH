@@ -3,12 +3,17 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useWeather, type WeatherData } from "@/hooks/use-weather";
 import { useTraffic, type TrafficData } from "@/hooks/use-traffic";
+import { useTriggerMonitor } from "@/hooks/use-trigger-monitor";
+import { useDisasterAlerts } from "@/hooks/use-disaster-alerts";
+import { useForecast } from "@/hooks/use-forecast";
 import { plansById, type InsurancePlan, type PlanId } from "@/lib/plans";
 import {
   computeAIScoring,
   type AIScoringInput,
   type AIScoringOutput,
 } from "@/lib/ai-scoring-engine";
+import { getModelStatus } from "@/lib/ml-fraud-model";
+import { getHyperLocalRisk, getHazardLabel } from "@/lib/hyper-local-risk";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
@@ -40,6 +45,12 @@ import {
   ArrowRight,
   Thermometer,
   Droplets,
+  ShieldCheck,
+  Brain,
+  Radar,
+  Globe,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 
@@ -1092,20 +1103,704 @@ function PolicyRulesCard() {
   );
 }
 
+// ─── ML Neural Network Card ────────────────────────────────────────────────────
+function MLModelCard({ aiScore }: { aiScore: AIScoringOutput }) {
+  const [mlStatus, setMlStatus] = useState(getModelStatus);
+
+  useEffect(() => {
+    const id = setInterval(() => setMlStatus(getModelStatus()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const isReady = mlStatus.ready;
+  const accuracy = isReady ? mlStatus.accuracy : mlStatus.accuracy;
+  const epochProgress = isReady ? 100 : Math.min(100, (mlStatus.epoch / 80) * 100);
+
+  // Neural network layer sizes
+  const layers = [
+    { label: "Input", size: 12, color: "#6366f1" },
+    { label: "Hidden₁", size: 16, color: "#8b5cf6" },
+    { label: "Hidden₂", size: 8, color: "#a78bfa" },
+    { label: "Output", size: 1, color: "#10b981" },
+  ];
+
+  // Top features from ML
+  const topFeatures = aiScore.featureContributions.slice(0, 6);
+  const maxImpact = Math.max(
+    ...aiScore.featureContributions.map((f) => f.absImpact),
+    0.01,
+  );
+
+  const fraudProb = aiScore.mlPrediction?.fraudProbability ?? (aiScore.fraudConfidence / 100);
+  const legitProb = 1 - fraudProb;
+
+  return (
+    <DashCard
+      className="col-span-1 md:col-span-2 xl:col-span-3 flex flex-col gap-5"
+      delay={0.28}
+    >
+      <div className="flex items-center justify-between">
+        <CardLabel
+          icon={<Brain className="w-4 h-4" />}
+          label="ML Neural Network"
+        />
+        <div className="flex items-center gap-2">
+          {isReady ? (
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-500 bg-emerald-500/10 border border-emerald-500/15 px-2.5 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Model Active
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/15 px-2.5 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              Training Epoch {mlStatus.epoch}/80
+            </span>
+          )}
+          <span className="text-[10px] font-mono text-white/20 px-2 py-1 rounded-full bg-white/5 border border-white/10">
+            {aiScore.modelType === "hybrid" ? "Hybrid" : aiScore.modelType === "ml" ? "ML" : "Fallback"}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* ── Column 1: Architecture Visualization ── */}
+        <div className="flex flex-col gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20">
+            Architecture: 12→16→8→1
+          </p>
+          <div className="flex items-center justify-between gap-2 py-3">
+            {layers.map((layer, li) => (
+              <div key={layer.label} className="flex flex-col items-center gap-1.5">
+                {/* Neurons */}
+                <div
+                  className="flex flex-col items-center gap-0.5"
+                  style={{ minHeight: "80px", justifyContent: "center" }}
+                >
+                  {Array.from({ length: Math.min(layer.size, 6) }).map((_, ni) => (
+                    <motion.div
+                      key={`n-${li}-${ni}`}
+                      className="rounded-full border"
+                      style={{
+                        width: layer.size === 1 ? 14 : 8,
+                        height: layer.size === 1 ? 14 : 8,
+                        borderColor: layer.color,
+                        backgroundColor: isReady
+                          ? `${layer.color}40`
+                          : "transparent",
+                      }}
+                      animate={{
+                        opacity: isReady ? 1 : [0.3, 0.8, 0.3],
+                        scale: isReady ? 1 : [1, 1.2, 1],
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        delay: li * 0.15 + ni * 0.05,
+                        repeat: isReady ? 0 : Infinity,
+                      }}
+                    />
+                  ))}
+                  {layer.size > 6 && (
+                    <span className="text-[8px] text-white/20 font-mono">
+                      +{layer.size - 6}
+                    </span>
+                  )}
+                </div>
+                {/* Connections line */}
+                {li < layers.length - 1 && (
+                  <div
+                    className="absolute"
+                    style={{
+                      left: `${(li + 0.5) * 25}%`,
+                      width: "25%",
+                    }}
+                  />
+                )}
+                {/* Label */}
+                <span className="text-[9px] text-white/30 font-mono">
+                  {layer.label}
+                </span>
+                <span className="text-[8px] text-white/15 font-mono">
+                  {layer.size}n
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Connection lines animation */}
+          {isReady && (
+            <div className="flex items-center gap-1 px-2">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={`conn-${i}`}
+                  className="flex-1 h-px"
+                  style={{
+                    background: `linear-gradient(90deg, ${layers[i].color}40, ${layers[i + 1].color}40)`,
+                  }}
+                  animate={{ opacity: [0.3, 0.8, 0.3] }}
+                  transition={{
+                    duration: 2,
+                    delay: i * 0.3,
+                    repeat: Infinity,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Model specs */}
+          <div className="grid grid-cols-2 gap-1.5 mt-1">
+            <div className="rounded-md bg-white/[0.03] border border-white/5 px-2.5 py-1.5">
+              <p className="text-[8px] text-white/15 uppercase tracking-wider">Activation</p>
+              <p className="text-[11px] text-white/50 font-medium">Leaky ReLU</p>
+            </div>
+            <div className="rounded-md bg-white/[0.03] border border-white/5 px-2.5 py-1.5">
+              <p className="text-[8px] text-white/15 uppercase tracking-wider">Optimizer</p>
+              <p className="text-[11px] text-white/50 font-medium">SGD + Momentum</p>
+            </div>
+            <div className="rounded-md bg-white/[0.03] border border-white/5 px-2.5 py-1.5">
+              <p className="text-[8px] text-white/15 uppercase tracking-wider">Loss</p>
+              <p className="text-[11px] text-white/50 font-medium">Binary BCE</p>
+            </div>
+            <div className="rounded-md bg-white/[0.03] border border-white/5 px-2.5 py-1.5">
+              <p className="text-[8px] text-white/15 uppercase tracking-wider">Training</p>
+              <p className="text-[11px] text-white/50 font-medium">500 samples</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Column 2: Training Metrics ── */}
+        <div className="flex flex-col gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20">
+            Training Metrics
+          </p>
+
+          {/* Training progress */}
+          <div className="space-y-3">
+            <div>
+              <div className="flex justify-between text-[10px] mb-1.5">
+                <span className="text-white/30 font-medium">Training Progress</span>
+                <span className="text-white/50 font-semibold font-mono">
+                  {isReady ? "Complete" : `${Math.round(epochProgress)}%`}
+                </span>
+              </div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-emerald-500"
+                  animate={{ width: `${epochProgress}%` }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-[10px] mb-1.5">
+                <span className="text-white/30 font-medium">Model Accuracy</span>
+                <span className="text-emerald-500 font-semibold font-mono">
+                  {(accuracy * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full bg-emerald-500/60"
+                  animate={{ width: `${accuracy * 100}%` }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-[10px] mb-1.5">
+                <span className="text-white/30 font-medium">Loss (BCE)</span>
+                <span className="text-amber-400 font-semibold font-mono">
+                  {mlStatus.loss.toFixed(4)}
+                </span>
+              </div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full bg-amber-500/40"
+                  animate={{ width: `${Math.min(100, mlStatus.loss * 100)}%` }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Fraud probability gauge */}
+          <div className="mt-auto rounded-lg bg-white/[0.02] border border-[#1f1f1f] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-3">
+              Real-Time Fraud Probability
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative w-16 h-16 shrink-0">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
+                  <circle
+                    cx="32" cy="32" r="26"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.05)"
+                    strokeWidth="6"
+                  />
+                  <motion.circle
+                    cx="32" cy="32" r="26"
+                    fill="none"
+                    stroke={fraudProb > 0.5 ? "#f87171" : "#10b981"}
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 26}
+                    animate={{
+                      strokeDashoffset:
+                        2 * Math.PI * 26 * (1 - legitProb),
+                    }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span
+                    className={`text-lg font-bold tabular-nums ${
+                      fraudProb > 0.5 ? "text-red-400" : "text-emerald-500"
+                    }`}
+                  >
+                    {(legitProb * 100).toFixed(0)}
+                  </span>
+                  <span className="text-[7px] text-white/20">legit%</span>
+                </div>
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-[10px] text-white/30">Legitimate</span>
+                  <span className="text-[10px] text-emerald-500 font-semibold font-mono">
+                    {(legitProb * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] text-white/30">Fraud Risk</span>
+                  <span className="text-[10px] text-red-400 font-semibold font-mono">
+                    {(fraudProb * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] text-white/30">Confidence</span>
+                  <span className="text-[10px] text-white/50 font-semibold font-mono">
+                    {aiScore.mlPrediction
+                      ? `${(aiScore.mlPrediction.confidence * 100).toFixed(0)}%`
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Column 3: Feature Importance ── */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20">
+              Feature Importance
+            </p>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/15 font-medium">
+              Perturbation
+            </span>
+          </div>
+
+          {topFeatures.length > 0 ? (
+            <div className="space-y-2">
+              {topFeatures.map((fc, i) => {
+                const barWidth = Math.max(8, (fc.absImpact / maxImpact) * 100);
+                const isFraudSignal = fc.impact > 0;
+
+                return (
+                  <div key={fc.featureName} className="space-y-1">
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-white/40 font-medium truncate">
+                        {fc.featureName}
+                      </span>
+                      <span
+                        className={`font-mono shrink-0 ml-2 ${
+                          isFraudSignal ? "text-red-400" : "text-emerald-400"
+                        }`}
+                      >
+                        {isFraudSignal ? "↑" : "↓"}{" "}
+                        {Math.abs(fc.impact).toFixed(3)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div
+                        className={`h-full rounded-full ${
+                          isFraudSignal
+                            ? "bg-gradient-to-r from-red-500/30 to-red-500/60"
+                            : "bg-gradient-to-r from-emerald-500/30 to-emerald-500/60"
+                        }`}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${barWidth}%` }}
+                        transition={{
+                          duration: 0.8,
+                          delay: i * 0.08,
+                          ease: "easeOut",
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center py-6">
+              <p className="text-xs text-white/20">
+                {isReady ? "Computing features..." : "Awaiting model training..."}
+              </p>
+            </div>
+          )}
+
+          <p className="text-[9px] text-white/10 mt-auto">
+            <span className="text-red-400/60">↑ fraud signal</span>{" "}
+            <span className="text-white/10">·</span>{" "}
+            <span className="text-emerald-400/60">↓ legit signal</span>{" "}
+            <span className="text-white/10">·</span> SHAP-like perturbation
+          </p>
+
+          {/* Inference time */}
+          <div className="flex items-center gap-2 rounded-md bg-white/[0.03] border border-white/5 px-3 py-2">
+            <Cpu className="w-3 h-3 text-white/15" />
+            <span className="text-[10px] text-white/30">
+              Inference: <span className="text-white/50 font-mono">&lt;1ms</span> in-browser
+            </span>
+            <span className="text-[10px] text-white/15 ml-auto font-mono">
+              {mlStatus.epoch} epochs
+            </span>
+          </div>
+        </div>
+      </div>
+    </DashCard>
+  );
+}
+
+// ─── 8b. Auto-Protect Card ────────────────────────────────────────────────────
+function AutoProtectCard({
+  triggerMonitor,
+}: {
+  triggerMonitor: ReturnType<typeof useTriggerMonitor>;
+}) {
+  const { enabled, evaluation, recentAutoClaims, isFiling, lastCheckAt, sessionClaimCount, toggleAutoProtect } = triggerMonitor;
+
+  return (
+    <DashCard className="flex flex-col gap-4" delay={0.42}>
+      <div className="flex items-center justify-between">
+        <CardLabel icon={<Radar className="w-4 h-4" />} label="Auto-Protect" />
+        <button
+          type="button"
+          onClick={toggleAutoProtect}
+          className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors"
+        >
+          {enabled ? (
+            <>
+              <ToggleRight className="w-5 h-5 text-emerald-500" />
+              <span className="text-emerald-500">Active</span>
+            </>
+          ) : (
+            <>
+              <ToggleLeft className="w-5 h-5 text-white/20" />
+              <span className="text-white/30">Off</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {enabled ? (
+        <>
+          <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-4 py-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-500/70">
+                Zero-Touch Monitoring
+              </span>
+            </div>
+            <p className="text-sm text-emerald-500/80 font-medium">
+              {isFiling
+                ? "Filing auto-claim..."
+                : evaluation?.isBreached
+                  ? `${evaluation.triggers.length} trigger(s) breached — monitoring sustained duration`
+                  : "All triggers within safe limits"}
+            </p>
+            <p className="text-[10px] text-white/15 mt-1 font-mono">
+              Last check: {lastCheckAt?.toLocaleTimeString() ?? "—"} · Claims: {sessionClaimCount}
+            </p>
+          </div>
+
+          {/* Trigger status rows */}
+          {evaluation && evaluation.triggers.length > 0 && (
+            <div className="space-y-1.5">
+              {evaluation.triggers.slice(0, 3).map((t) => (
+                <div
+                  key={t.rule.id}
+                  className="flex items-center justify-between rounded-lg bg-amber-500/5 border border-amber-500/10 px-3 py-2 text-xs"
+                >
+                  <span className="text-amber-400 font-medium">{t.rule.label}</span>
+                  <span className="text-white/40 font-mono">
+                    {t.currentValue}{t.rule.unit} / {t.rule.threshold}{t.rule.unit}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recent auto-claims */}
+          {recentAutoClaims.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-2">Recent Auto-Claims</p>
+              {recentAutoClaims.slice(0, 2).map((c, i) => (
+                <div key={`ac-${i}`} className="flex items-center justify-between text-xs py-1.5">
+                  <span className="text-white/40">{c.trigger.rule.label}</span>
+                  <span className={c.success ? "text-emerald-500" : "text-red-400"}>
+                    {c.success ? `₹${c.payoutAmount ?? 0}` : "Failed"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="rounded-lg bg-white/[0.02] border border-white/5 px-4 py-6 text-center">
+          <p className="text-sm text-white/30">Auto-protect is disabled</p>
+          <p className="text-[11px] text-white/15 mt-1">
+            Enable to auto-file claims when triggers breach thresholds
+          </p>
+        </div>
+      )}
+    </DashCard>
+  );
+}
+
+// ─── 8c. Disaster Alerts Card ─────────────────────────────────────────────────
+function DisasterAlertsCard({
+  alerts,
+}: {
+  alerts: ReturnType<typeof useDisasterAlerts>;
+}) {
+  const severityColors: Record<string, string> = {
+    extreme: "text-red-400 bg-red-500/10 border-red-500/15",
+    severe: "text-orange-400 bg-orange-500/10 border-orange-500/15",
+    moderate: "text-amber-400 bg-amber-500/10 border-amber-500/15",
+    minor: "text-white/40 bg-white/5 border-white/10",
+  };
+
+  return (
+    <DashCard className="flex flex-col gap-4" delay={0.45}>
+      <div className="flex items-center justify-between">
+        <CardLabel icon={<Globe className="w-4 h-4" />} label="Disaster Alerts" />
+        <span className="text-[10px] font-semibold text-white/30">
+          {alerts.activeCount} active
+        </span>
+      </div>
+
+      {alerts.isLoading ? (
+        <p className="text-xs text-white/20">Fetching alerts...</p>
+      ) : alerts.alerts.length === 0 ? (
+        <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/15 px-4 py-3">
+          <p className="text-sm text-emerald-500/80 font-medium flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4" /> No active disasters in your region
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {alerts.alerts.slice(0, 3).map((alert) => (
+            <div
+              key={alert.id}
+              className={cn(
+                "rounded-lg border px-3 py-2.5",
+                severityColors[alert.severity] ?? severityColors.minor,
+              )}
+            >
+              <p className="text-xs font-semibold">{alert.title}</p>
+              <p className="text-[10px] opacity-60 mt-0.5 line-clamp-2">
+                {alert.description}
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[9px] uppercase tracking-wider font-semibold">
+                  {alert.severity}
+                </span>
+                <span className="text-[9px] opacity-40">· {alert.source}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </DashCard>
+  );
+}
+
+// ─── 8d. Forecast Card ────────────────────────────────────────────────────────
+function ForecastCard({
+  forecast,
+}: {
+  forecast: ReturnType<typeof useForecast>;
+}) {
+  return (
+    <DashCard className="flex flex-col gap-4" delay={0.48}>
+      <CardLabel icon={<TrendingUp className="w-4 h-4" />} label="24h Forecast" />
+
+      {forecast.isLoading ? (
+        <p className="text-xs text-white/20">Loading forecast...</p>
+      ) : (
+        <>
+          {/* Next risk prediction */}
+          <div
+            className={cn(
+              "rounded-lg border px-4 py-3",
+              forecast.nextRiskHour !== null && forecast.nextRiskHour <= 3
+                ? "bg-amber-500/5 border-amber-500/15"
+                : "bg-white/[0.03] border-white/10",
+            )}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-1">
+              Predictive Risk
+            </p>
+            <p
+              className={cn(
+                "text-sm font-medium",
+                forecast.nextRiskHour !== null && forecast.nextRiskHour <= 3
+                  ? "text-amber-400"
+                  : "text-white/50",
+              )}
+            >
+              {forecast.nextRiskDescription}
+            </p>
+          </div>
+
+          {/* Hourly bars */}
+          <div className="flex items-end gap-0.5 h-12">
+            {forecast.hourly.slice(0, 24).map((h, i) => {
+              const height = Math.max(2, (h.precipitationProbability / 100) * 48);
+              return (
+                <div
+                  key={`fh-${i}`}
+                  className="flex-1 rounded-sm transition-all"
+                  style={{
+                    height: `${height}px`,
+                    backgroundColor: h.isRisky
+                      ? "rgba(245,158,11,0.5)"
+                      : `rgba(255,255,255,${0.05 + (h.precipitationProbability / 100) * 0.15})`,
+                  }}
+                  title={`${h.hour}:00 — ${h.precipitationProbability}% rain, ${h.temperature}°C`}
+                />
+              );
+            })}
+          </div>
+          <div className="flex justify-between text-[9px] text-white/15">
+            <span>Now</span>
+            <span>+12h</span>
+            <span>+24h</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-white/[0.03] border border-[#1f1f1f] p-2.5">
+              <p className="text-[9px] text-white/15 uppercase tracking-wider mb-1">Peak Rain %</p>
+              <p className="text-sm font-bold text-foreground">{forecast.peakRainProbability}%</p>
+            </div>
+            <div className="rounded-lg bg-white/[0.03] border border-[#1f1f1f] p-2.5">
+              <p className="text-[9px] text-white/15 uppercase tracking-wider mb-1">Avg Risk</p>
+              <p className="text-sm font-bold text-foreground">{forecast.averageRisk}/100</p>
+            </div>
+          </div>
+        </>
+      )}
+    </DashCard>
+  );
+}
+
+// ─── 8e. Hyper-Local Risk Card ────────────────────────────────────────────────
+function HyperLocalRiskCard({ lat, lng }: { lat: number; lng: number }) {
+  const profile = getHyperLocalRisk(lat, lng);
+
+  return (
+    <DashCard className="flex flex-col gap-4" delay={0.5}>
+      <div className="flex items-center justify-between">
+        <CardLabel icon={<MapPin className="w-4 h-4" />} label="Micro-Zone Risk" />
+        {profile.matched && (
+          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/40">
+            {profile.zone?.pincode}
+          </span>
+        )}
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-foreground">{profile.localityLabel}</p>
+        {profile.zone && (
+          <p className="text-[11px] text-white/30 mt-0.5">{profile.zone.ward} · {profile.distanceKm}km</p>
+        )}
+      </div>
+
+      {/* Risk multiplier */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Rain", value: `${profile.rainSensitivity}×`, icon: <CloudRain className="w-3 h-3" /> },
+          { label: "AQI", value: `${profile.aqiSensitivity}×`, icon: <Wind className="w-3 h-3" /> },
+          { label: "Traffic", value: `${profile.trafficSensitivity}×`, icon: <Navigation className="w-3 h-3" /> },
+        ].map((item) => (
+          <div key={item.label} className="rounded-lg bg-white/[0.03] border border-[#1f1f1f] p-2.5 text-center">
+            <span className="text-white/20 flex justify-center mb-1">{item.icon}</span>
+            <p className="text-sm font-bold text-foreground">{item.value}</p>
+            <p className="text-[9px] text-white/15">{item.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Hazards */}
+      {profile.activeHazards.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mb-2">Known Hazards</p>
+          <div className="flex flex-wrap gap-1.5">
+            {profile.activeHazards.map((h) => (
+              <span
+                key={h}
+                className="inline-flex px-2 py-1 rounded-md bg-amber-500/5 border border-amber-500/10 text-[10px] text-amber-400/70 font-medium"
+              >
+                {getHazardLabel(h)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {profile.historicalClaimDensity > 0 && (
+        <p className="text-[10px] text-white/15 font-mono mt-auto">
+          Historical density: {profile.historicalClaimDensity} claims/1k users/month
+        </p>
+      )}
+    </DashCard>
+  );
+}
+
 // ─── System Health Bar ─────────────────────────────────────────────────────────
 function SystemHealthBar() {
+  const [mlStatus, setMlStatus] = useState(getModelStatus);
+
+  useEffect(() => {
+    const id = setInterval(() => setMlStatus(getModelStatus()), 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  const systemItems = [
+    {
+      label: mlStatus.ready ? "ML Model" : "ML Training",
+      status: mlStatus.ready ? "Active" : `Epoch ${mlStatus.epoch}`,
+      pct: mlStatus.ready ? Math.round(mlStatus.accuracy * 100) : Math.min(95, mlStatus.epoch),
+    },
+    { label: "Data Feed", status: "Live", pct: 100 },
+    { label: "Trigger Engine", status: "Active", pct: 99 },
+    { label: "Claim API", status: "Active", pct: 97 },
+  ];
+
   return (
     <div className="flex flex-wrap items-center gap-3 px-5 py-3 rounded-xl border border-[#1f1f1f] bg-[#111] mb-6">
       <Wifi className="w-3.5 h-3.5 text-white/20 shrink-0" />
       <span className="text-[10px] font-semibold uppercase tracking-widest text-white/20 mr-1">
         System
       </span>
-      {MOCK.systemHealth.map((s) => (
+      {systemItems.map((s) => (
         <div key={s.label} className="flex items-center gap-1.5">
           <span
             className={cn(
               "w-1.5 h-1.5 rounded-full",
-              s.pct >= 98 ? "bg-emerald-500" : "bg-amber-400",
+              s.pct >= 98 ? "bg-emerald-500" : s.pct >= 80 ? "bg-amber-400" : "bg-white/30 animate-pulse",
             )}
           />
           <span className="text-[11px] font-medium text-white/40">
@@ -1114,19 +1809,25 @@ function SystemHealthBar() {
           <span
             className={cn(
               "text-[10px] font-semibold",
-              s.pct >= 98 ? "text-emerald-500/70" : "text-amber-400/70",
+              s.pct >= 98 ? "text-emerald-500/70" : s.pct >= 80 ? "text-amber-400/70" : "text-white/30",
             )}
           >
             {s.pct}%
           </span>
         </div>
       ))}
+      {mlStatus.ready && (
+        <div className="flex items-center gap-1.5 ml-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/15">
+          <Brain className="w-3 h-3 text-emerald-500" />
+          <span className="text-[10px] font-semibold text-emerald-500">Neural Net</span>
+        </div>
+      )}
       <div className="ml-auto flex items-center gap-1.5 text-white/15">
         <RefreshCw
           className="w-3 h-3 animate-spin"
           style={{ animationDuration: "3s" }}
         />
-        <span className="text-[10px] font-mono">Syncing every 2.5s</span>
+        <span className="text-[10px] font-mono">Live sync</span>
       </div>
     </div>
   );
@@ -1139,6 +1840,9 @@ export default function Dashboard() {
   const [time, setTime] = useState(new Date());
   const weather = useWeather();
   const traffic = useTraffic();
+  const triggerMonitor = useTriggerMonitor(weather, traffic);
+  const disasterAlerts = useDisasterAlerts(weather.lat, weather.lon);
+  const forecast = useForecast(weather.lat, weather.lon);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -1261,6 +1965,9 @@ export default function Dashboard() {
     approvalRate,
     fraudFlags,
     consistency,
+    rainIntensity: weather.rain1h,
+    aqiLevel: weather.aqi,
+    trafficCongestion: traffic.congestionLevel,
   });
 
   const liveRisk = computeLiveRiskSnapshot(weather, traffic);
@@ -1338,16 +2045,20 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mb-2">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 bg-white/5 text-[10px] text-white/40 font-medium tracking-widest uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              AI Insurance Engine — Active
+              ML-Powered Insurance Engine — Active
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-emerald-500/15 bg-emerald-500/5 text-[10px] text-emerald-500/70 font-medium tracking-widest uppercase">
+              <Radar className="w-3 h-3" />
+              Zero-Touch Parametric
             </div>
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight leading-none">
             Welcome back, <span className="text-white/40">{displayName}</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
-            KlaimKavach AI is monitoring you{" "}
-            <span className="text-foreground font-semibold">24/7</span>. All
-            systems operational.
+            ML-powered parametric insurance engine monitoring you{" "}
+            <span className="text-foreground font-semibold">24/7</span>. Zero-touch
+            auto-claims active.
           </p>
         </div>
 
@@ -1430,7 +2141,15 @@ export default function Dashboard() {
         <AutoClaimEngineCard aiScore={aiScore} trigger={trigger} />
         <TrustScoreCard aiScore={aiScore} />
 
+        {/* ── ML Neural Network Card (Full Width) ── */}
+        <MLModelCard aiScore={aiScore} />
+
         <SmartAlertsCard />
+
+        <AutoProtectCard triggerMonitor={triggerMonitor} />
+        <DisasterAlertsCard alerts={disasterAlerts} />
+        <ForecastCard forecast={forecast} />
+        <HyperLocalRiskCard lat={weather.lat} lng={weather.lon} />
 
         <PolicyRulesCard />
         <EarningsProtectedCard />
@@ -1445,8 +2164,9 @@ export default function Dashboard() {
       >
         <Clock className="w-3.5 h-3.5" />
         <span>
-          Data refreshes every 2.5s · Powered by KlaimKavach AI Engine v2.1
+          Neural network + parametric triggers · KlaimKavach ML Engine v3.0
         </span>
+        <Brain className="w-3.5 h-3.5 text-emerald-500/40" />
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
       </motion.div>
     </div>

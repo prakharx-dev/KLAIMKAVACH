@@ -26,7 +26,10 @@ function parseInrAmount(value) {
   return Math.round(amount * 100);
 }
 
-async function validatePaymentWithRazorpay({ razorpayOrderId, razorpayPaymentId }) {
+async function validatePaymentWithRazorpay({
+  razorpayOrderId,
+  razorpayPaymentId,
+}) {
   if (!razorpayClient) {
     return {
       success: false,
@@ -154,7 +157,9 @@ export async function verifyPayment(req, res) {
       return;
     }
 
-    res.status(200).json({ success: true, verifiedBy: apiValidation.verifiedBy });
+    res
+      .status(200)
+      .json({ success: true, verifiedBy: apiValidation.verifiedBy });
   } catch (error) {
     console.error("Razorpay Verify Error:", error);
     res.status(500).json({

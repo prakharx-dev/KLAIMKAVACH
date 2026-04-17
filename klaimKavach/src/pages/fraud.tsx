@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
@@ -15,8 +15,11 @@ import {
   Navigation,
   Shield,
   Activity,
+  Brain,
+  BarChart3,
 } from "lucide-react";
 import { computeAIScoring } from "@/lib/ai-scoring-engine";
+import { getModelStatus } from "@/lib/ml-fraud-model";
 import { useWeather } from "@/hooks/use-weather";
 import { useTraffic } from "@/hooks/use-traffic";
 
@@ -73,7 +76,16 @@ export default function Fraud() {
     approvalRate,
     fraudFlags,
     consistency,
+    rainIntensity: weather.rain1h,
+    aqiLevel: weather.aqi,
+    trafficCongestion: traffic.congestionLevel,
   });
+
+  const [mlStatus, setMlStatus] = useState(getModelStatus);
+  useEffect(() => {
+    const id = setInterval(() => setMlStatus(getModelStatus()), 2000);
+    return () => clearInterval(id);
+  }, []);
 
   const trustScore = aiScore.trustScore;
   const trustStatus =
@@ -137,9 +149,18 @@ export default function Fraud() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_15%,rgba(16,185,129,0.18),transparent_42%),radial-gradient(circle_at_85%_20%,rgba(56,189,248,0.15),transparent_45%)]" />
         <div className="relative p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Trust Engine Live
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+              {mlStatus.ready ? (
+                <><Brain className="w-3 h-3" /> ML Model Active</>
+              ) : (
+                <><Activity className="w-3 h-3 animate-pulse" /> Training Epoch {mlStatus.epoch}</>
+              )}
             </span>
+            {aiScore.modelType !== "rule-fallback" && (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-purple-500/10 text-purple-400 border border-purple-500/15">
+                Neural Net · {(aiScore.modelAccuracy * 100).toFixed(0)}% accuracy
+              </span>
+            )}
             <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-card/70 border border-border text-foreground">
               {telematicsText}
             </span>
@@ -154,8 +175,8 @@ export default function Fraud() {
                     <Info className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
-                    AI analyzes trip history, GPS telemetry, and claim behavior
-                    to continuously update trust and fraud risk.
+                    Our neural network analyzes trip history, GPS telemetry, and claim behavior
+                    patterns to continuously update trust and fraud risk using machine learning.
                   </TooltipContent>
                 </Tooltip>
               </h1>
@@ -404,6 +425,61 @@ export default function Fraud() {
           )}
         </div>
       </Card>
+
+      {/* ML Feature Importance */}
+      {aiScore.featureContributions.length > 0 && (
+        <Card className="p-5 border-border/80">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-2">
+              <BarChart3 className="w-3.5 h-3.5" />
+              ML Feature Importance
+            </p>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/15 font-medium">
+              Neural Network
+            </span>
+          </div>
+          <div className="space-y-2.5">
+            {aiScore.featureContributions.slice(0, 8).map((fc) => {
+              const maxImpact = Math.max(
+                ...aiScore.featureContributions.map((f) => f.absImpact),
+                0.01,
+              );
+              const barWidth = Math.max(5, (fc.absImpact / maxImpact) * 100);
+              const isFraudSignal = fc.impact > 0;
+
+              return (
+                <div key={fc.featureName} className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground w-32 shrink-0 truncate">
+                    {fc.featureName}
+                  </span>
+                  <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
+                    <motion.div
+                      className={`h-full rounded-full ${
+                        isFraudSignal
+                          ? "bg-red-500/40"
+                          : "bg-emerald-500/40"
+                      }`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${barWidth}%` }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                    />
+                  </div>
+                  <span
+                    className={`text-[10px] font-mono w-14 text-right shrink-0 ${
+                      isFraudSignal ? "text-red-400" : "text-emerald-400"
+                    }`}
+                  >
+                    {isFraudSignal ? "↑" : "↓"} {Math.abs(fc.impact).toFixed(3)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-3">
+            ↑ = pushes toward fraud · ↓ = pushes toward legitimate · Based on perturbation analysis
+          </p>
+        </Card>
+      )}
     </div>
   );
 }

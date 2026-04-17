@@ -70,6 +70,20 @@ const payoutSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    source: {
+      type: String,
+      enum: ["manual", "auto"],
+      default: "manual",
+    },
+    triggerData: {
+      ruleId: { type: String },
+      ruleLabel: { type: String },
+      category: { type: String },
+      currentValue: { type: Number },
+      threshold: { type: Number },
+      severity: { type: String },
+      sustainedMinutes: { type: Number },
+    },
   },
   {
     timestamps: true,

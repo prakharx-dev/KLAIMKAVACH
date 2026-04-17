@@ -464,6 +464,7 @@ export async function createClaim(req, res) {
       1,
       24,
     );
+    const source = body.source === "auto" ? "auto" : "manual";
 
     if (!Number.isFinite(requestedAmount) || requestedAmount < 0) {
       res.status(400).json({
@@ -628,6 +629,7 @@ export async function createClaim(req, res) {
       riskScore: claimRiskScore,
       flagged,
       flagReason,
+      source,
     });
 
     if (status === "blocked") {
